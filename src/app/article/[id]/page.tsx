@@ -27,6 +27,8 @@ async function getArticle(slug: string) {
   } catch { return null; }
 }
 
+export const dynamic = 'force-dynamic';
+
 export async function generateMetadata({ params }: { params: { id: string } }) {
   const data = await getArticle(params.id);
   if (!data) return { title: '404' };

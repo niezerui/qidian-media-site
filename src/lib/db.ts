@@ -2,6 +2,7 @@ import { createClient, type Client } from '@libsql/client';
 
 let client: Client | null = null;
 let initialized = false;
+let initPromise: Promise<void> | null = null;
 
 export function getDb(): Client {
   if (!client) {
@@ -20,12 +21,13 @@ export function getDb(): Client {
   return client;
 }
 
-// Run once on first request to ensure tables exist
+// Run once on first request to ensure tables exist (with concurrency lock)
 export async function ensureInit(): Promise<void> {
   if (initialized) return;
+  if (initPromise) { await initPromise; return; }
 
-  const db = getDb();
-
+  initPromise = (async () => {
+    const db = getDb();
   // 逐条执行建表（HTTP模式不支持executeMultiple）
   const tables = [
     `CREATE TABLE IF NOT EXISTS categories (id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL, description TEXT DEFAULT '', created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`,
@@ -84,7 +86,11 @@ export async function ensureInit(): Promise<void> {
     });
   }
 
-  initialized = true;
+    initialized = true;
+    initPromise = null;
+  })();
+
+  await initPromise;
 }
 
 // Helper: execute a query and return rows

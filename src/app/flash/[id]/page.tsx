@@ -2,18 +2,14 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { queryOne } from '@/lib/db';
 
 async function getFlashNews(id: string) {
-  try {
-    const vercelUrl = process.env.VERCEL_URL;
-    const base = vercelUrl ? `https://${vercelUrl}` : 'http://localhost:3000';
-    const data = await fetch(`${base}/api/flashes?pageSize=200`, { cache: 'no-store' }).then(r => r.json());
-    if (data.success) return data.data.find((f: any) => f.id === parseInt(id)) || null;
-    return null;
-  } catch {
-    return null;
-  }
+  try { return await queryOne('SELECT * FROM flash_news WHERE id = ?', [parseInt(id)]); }
+  catch { return null; }
 }
+
+export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: { id: string } }) {
   const flash = await getFlashNews(params.id);
