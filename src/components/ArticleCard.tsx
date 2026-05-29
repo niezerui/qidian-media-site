@@ -10,7 +10,7 @@ interface Article {
 
 function formatDate(d: string) { return new Date(d).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }); }
 
-export default function ArticleCard({ article, variant = 'default' }: { article: Article; variant?: 'default' | 'featured' | 'compact' }) {
+export default function ArticleCard({ article, variant = 'default' }: { article: Article; variant?: 'default' | 'featured' | 'compact' | 'list' }) {
   const date = formatDate(article.published_at);
 
   // 精选大图
@@ -52,6 +52,29 @@ export default function ArticleCard({ article, variant = 'default' }: { article:
             <img src={article.cover_image} alt="" className="w-full h-full object-cover" />
           </div>
         )}
+      </Link>
+    );
+  }
+
+  // 列表竖排：封面左 + 内容右
+  if (variant === 'list') {
+    return (
+      <Link href={`/article/${article.slug}`} className="group flex gap-4 py-4 border-b hover:opacity-70 transition-opacity" style={{ borderColor: 'var(--c-border)' }}>
+        {article.cover_image && (
+          <div className="w-40 h-24 flex-shrink-0 rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--c-surface)' }}>
+            <img src={article.cover_image} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+          </div>
+        )}
+        <div className="flex-1 min-w-0 py-1">
+          <div className="flex items-center gap-2 mb-1.5">
+            {article.category_name && <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: 'var(--c-surface)', color: 'var(--c-text-2)' }}>{article.category_name}</span>}
+            {article.is_exclusive && <span className="text-xs px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: 'var(--c-accent)' }}>独家</span>}
+          </div>
+          <h3 className="text-base font-bold line-clamp-2 leading-snug" style={{ color: 'var(--c-text)' }}>{article.title}</h3>
+          <div className="flex items-center gap-3 text-xs mt-2" style={{ color: 'var(--c-text-3)' }}>
+            <span>{article.author}</span><span>{date}</span>
+          </div>
+        </div>
       </Link>
     );
   }

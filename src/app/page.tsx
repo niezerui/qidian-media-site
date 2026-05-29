@@ -6,7 +6,7 @@ import { siteConfig } from '@/lib/site.config';
 import { query } from '@/lib/db';
 import { cleanContent, extractFirstImage } from '@/lib/security';
 
-const NAV_CATS = siteConfig.categories.filter(c => c.slug !== '24h-news');
+const NAV_CATS = siteConfig.categories;
 
 function parseArticle(a: any) {
   return {
@@ -82,8 +82,8 @@ export default async function HomePage({ searchParams }: { searchParams: { searc
               </div>
 
               {articles.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  {articles.map((a: any) => <ArticleCard key={a.id} article={a} />)}
+                <div className="border-t" style={{ borderColor: 'var(--c-border)' }}>
+                  {articles.map((a: any) => <ArticleCard key={a.id} article={a} variant="list" />)}
                 </div>
               ) : (
                 <div className="text-center py-20" style={{ color: 'var(--c-text-3)' }}>
