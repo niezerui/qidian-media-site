@@ -3,14 +3,22 @@ import Footer from '@/components/Footer';
 import ArticleCard from '@/components/ArticleCard';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getArticleBySlug } from '@/lib/data';
 
 async function getArticle(slug: string) {
   try {
-    return await getArticleBySlug(slug);
-  } catch {
+    const vercelUrl = process.env.VERCEL_URL;
+    const base = vercelUrl ? `https://${vercelUrl}` : 'http://localhost:3000';
+    const data = await fetch(`${base}/api/articles?pageSize=100`, { cache: 'no-store' }).then(r => r.json());
+    if (data.success) {
+      const article = data.data.find((a: any) => a.slug === slug);
+      if (article) {
+        const relatedData = await fetch(`${base}/api/articles?category=${article.category_slug}&pageSize=4`, { cache: 'no-store' }).then(r => r.json());
+        const related = relatedData.success ? relatedData.data.filter((a: any) => a.id !== article.id).slice(0, 3) : [];
+        return { article, related };
+      }
+    }
     return null;
-  }
+  } catch { return null; }
 }
 
 export async function generateMetadata({ params }: { params: { id: string } }) {

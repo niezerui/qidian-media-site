@@ -4,18 +4,19 @@ import ArticleCard from '@/components/ArticleCard';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { siteConfig } from '@/lib/site.config';
-import { getArticles, getFlashes } from '@/lib/data';
 
 const CATEGORY_NAMES: Record<string, string> = {};
 siteConfig.categories.forEach(c => { CATEGORY_NAMES[c.slug] = c.name; });
 
 async function getCategoryData(slug: string) {
   try {
-    const [articlesRes, flashesRes] = await Promise.all([
-      getArticles({ category: slug, pageSize: 20 }),
-      getFlashes({ pageSize: siteConfig.homepage.flashCount }),
+    const vercelUrl = process.env.VERCEL_URL;
+    const base = vercelUrl ? `https://${vercelUrl}` : 'http://localhost:3000';
+    const [articlesData, flashesData] = await Promise.all([
+      fetch(`${base}/api/articles?category=${slug}&pageSize=20`, { cache: 'no-store' }).then(r => r.json()),
+      fetch(`${base}/api/flashes?pageSize=${siteConfig.homepage.flashCount}`, { cache: 'no-store' }).then(r => r.json()),
     ]);
-    return { articles: articlesRes.data, flashes: flashesRes.data, total: articlesRes.total };
+    return { articles: articlesData.data || [], flashes: flashesData.data || [], total: articlesData.total || 0 };
   } catch { return { articles: [], flashes: [], total: 0 }; }
 }
 

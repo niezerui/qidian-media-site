@@ -3,7 +3,6 @@ import Footer from '@/components/Footer';
 import ArticleCard from '@/components/ArticleCard';
 import Link from 'next/link';
 import { siteConfig } from '@/lib/site.config';
-import { getArticles, getFlashes } from '@/lib/data';
 
 const c = siteConfig.colors;
 const ALL_CATEGORIES = siteConfig.categories;
@@ -11,21 +10,15 @@ const NAV_CATEGORIES = ALL_CATEGORIES.filter(cat => cat.slug !== '24h-news');
 
 async function getHomeData(searchQuery?: string) {
   try {
-    const [featuredRes, articlesRes, flashesRes] = await Promise.all([
-      getArticles({ featured: '1', pageSize: 5 }),
-      getArticles({ pageSize: 12, search: searchQuery }),
-      getFlashes({ pageSize: siteConfig.homepage.flashCount }),
+    const vercelUrl = process.env.VERCEL_URL;
+    const base = vercelUrl ? `https://${vercelUrl}` : 'http://localhost:3000';
+    const [fd, ad, fld] = await Promise.all([
+      fetch(`${base}/api/articles?featured=1&pageSize=5`, { cache: 'no-store' }).then(r => r.json()),
+      fetch(`${base}/api/articles?pageSize=12${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}`, { cache: 'no-store' }).then(r => r.json()),
+      fetch(`${base}/api/flashes?pageSize=${siteConfig.homepage.flashCount}`, { cache: 'no-store' }).then(r => r.json()),
     ]);
-    return {
-      featured: featuredRes.data,
-      articles: articlesRes.data,
-      flashes: flashesRes.data,
-      total: articlesRes.total,
-      searchQuery,
-    };
-  } catch {
-    return { featured: [], articles: [], flashes: [], total: 0, searchQuery };
-  }
+    return { featured: fd.data || [], articles: ad.data || [], flashes: fld.data || [], total: ad.total || 0, searchQuery };
+  } catch { return { featured: [], articles: [], flashes: [], total: 0, searchQuery }; }
 }
 
 export const dynamic = 'force-dynamic';
