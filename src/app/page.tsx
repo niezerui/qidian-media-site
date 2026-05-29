@@ -3,18 +3,35 @@ import Footer from '@/components/Footer';
 import ArticleCard from '@/components/ArticleCard';
 import Link from 'next/link';
 import { siteConfig } from '@/lib/site.config';
+import { query } from '@/lib/db';
+import { cleanContent, extractFirstImage } from '@/lib/security';
 
 const NAV_CATS = siteConfig.categories.filter(c => c.slug !== '24h-news');
 
+function parseArticle(a: any) {
+  return {
+    ...a,
+    content: cleanContent(a.content || ''),
+    cover_image: a.cover_image || extractFirstImage(a.content),
+    tags: JSON.parse(a.tags || '[]'),
+    is_featured: !!a.is_featured,
+    is_exclusive: !!a.is_exclusive,
+  };
+}
+
 async function getHomeData(search?: string) {
   try {
-    const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000');
-    const [fd, ad, fld] = await Promise.all([
-      fetch(`${base}/api/articles?featured=1&pageSize=5`, { cache: 'no-store' }).then(r => r.json()),
-      fetch(`${base}/api/articles?pageSize=12${search ? `&search=${encodeURIComponent(search)}` : ''}`, { cache: 'no-store' }).then(r => r.json()),
-      fetch(`${base}/api/flashes?pageSize=6`, { cache: 'no-store' }).then(r => r.json()),
+    const [featured, articles, flashes] = await Promise.all([
+      query(`SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE a.is_featured = 1 ORDER BY a.published_at DESC LIMIT 5`),
+      query(`SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id ${search ? "WHERE a.title LIKE ? OR a.summary LIKE ?" : ""} ORDER BY a.is_featured DESC, a.published_at DESC LIMIT 12`, search ? [`%${search}%`, `%${search}%`] : []),
+      query('SELECT * FROM flash_news ORDER BY published_at DESC LIMIT 6'),
     ]);
-    return { featured: fd.data || [], articles: ad.data || [], flashes: fld.data || [], search };
+    return {
+      featured: featured.map(parseArticle),
+      articles: articles.map(parseArticle),
+      flashes,
+      search,
+    };
   } catch { return { featured: [], articles: [], flashes: [], search }; }
 }
 

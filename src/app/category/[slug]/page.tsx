@@ -4,18 +4,23 @@ import ArticleCard from '@/components/ArticleCard';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { siteConfig } from '@/lib/site.config';
+import { query } from '@/lib/db';
+import { cleanContent, extractFirstImage } from '@/lib/security';
 
 const NAME_MAP: Record<string, string> = {};
 siteConfig.categories.forEach(c => NAME_MAP[c.slug] = c.name);
 
+function parseArticle(a: any) {
+  return { ...a, content: cleanContent(a.content || ''), cover_image: a.cover_image || extractFirstImage(a.content), tags: JSON.parse(a.tags || '[]') };
+}
+
 async function getCatData(slug: string) {
   try {
-    const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000');
-    const [ad, fd] = await Promise.all([
-      fetch(`${base}/api/articles?category=${slug}&pageSize=20`, { cache: 'no-store' }).then(r => r.json()),
-      fetch(`${base}/api/flashes?pageSize=6`, { cache: 'no-store' }).then(r => r.json()),
+    const [articles, flashes] = await Promise.all([
+      query(`SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE c.slug = ? ORDER BY a.published_at DESC LIMIT 20`, [slug]),
+      query('SELECT * FROM flash_news ORDER BY published_at DESC LIMIT 6'),
     ]);
-    return { articles: ad.data || [], flashes: fd.data || [], total: ad.total || 0 };
+    return { articles: articles.map(parseArticle), flashes, total: articles.length };
   } catch { return { articles: [], flashes: [], total: 0 }; }
 }
 
