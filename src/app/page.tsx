@@ -41,14 +41,17 @@ export default async function HomePage({ searchParams }: { searchParams: { searc
       <Header />
       <main className="flex-1">
         {/* ===== Category Navigation ===== */}
-        <div className="border-b" style={{ borderColor: c.border, backgroundColor: c.surface }}>
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-              <Link href="/" className="px-4 py-3 text-sm font-medium rounded-lg text-center transition-colors hover:opacity-80 whitespace-nowrap"
-                style={{ backgroundColor: c.primary, color: '#fff' }}>推荐</Link>
+        <div className="border-b" style={{ borderColor: c.border, backgroundColor: '#fff' }}>
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center gap-6 overflow-x-auto scrollbar-hide py-3">
+              <Link href="/" className="text-sm font-bold whitespace-nowrap pb-2 border-b-2 transition-colors"
+                style={{ color: c.textPrimary, borderColor: c.accent }}>
+                {siteConfig.name}推荐
+              </Link>
               {NAV_CATEGORIES.map(cat => (
-                <Link key={cat.slug} href={`/category/${cat.slug}`} className="px-3 py-3 text-sm rounded-lg text-center transition-colors hover:opacity-80 whitespace-nowrap"
-                  style={{ backgroundColor: c.surface, color: c.textSecondary, border: `1px solid ${c.border}` }}>
+                <Link key={cat.slug} href={`/category/${cat.slug}`}
+                  className="text-sm whitespace-nowrap pb-2 border-b-2 border-transparent hover:border-current transition-colors"
+                  style={{ color: c.textSecondary }}>
                   {cat.name}
                 </Link>
               ))}

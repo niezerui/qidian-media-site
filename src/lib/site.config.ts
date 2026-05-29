@@ -1,5 +1,6 @@
 // ========================================
 // 奇点网站全局配置 — 改这里的值即可调整网站
+// ⚠️ 路径请用正斜杠 / 不要用反斜杠 \
 // ========================================
 
 export const siteConfig = {
@@ -9,42 +10,43 @@ export const siteConfig = {
   slogan: '用有趣、好玩的视角，看科技，看人文，找寻时代奇点',
   description: '记录智能时代的每一次突破',
 
-  // ---- Logo（可改为图片URL） ----
+  // ---- Logo ----
+  // type: 'text'=文字logo  'image'=图片logo（图片放到 public/ 目录）
   logo: {
-    type: 'image' as 'text' | 'image',  // 你已改为图片模式
-    text: '奇',                          // type='text'时的文字
-    imageUrl: '/logo.png',              // 图片路径 → 把logo图片放到 public/logo.png
+    type: 'image' as 'text' | 'image',
+    text: '奇',
+    imageUrl: '/logo.png',           // ← 图片已放到 public/logo.png
   },
 
-  // ---- 配色 ----
+  // ---- 配色（改hex值立即生效） ----
   colors: {
-    primary: '#121212',       // 主色（导航、按钮、标题）
-    accent: '#f4d933',        // 强调色（链接、标签、快讯圆点）
-    background: '#ffffff',    // 页面背景
-    surface: '#f8f8f8',       // 卡片背景
-    border: '#e4e4e4',       // 边框
-    textPrimary: '#1a1a1a',  // 主文字
-    textSecondary: '#6a6a6a', // 次要文字
-    textMuted: '#9a9a9a',    // 辅助文字
-    footer: '#0d0d0d',       // 页脚背景
+    primary: '#121212',
+    accent: '#f4d933',
+    background: '#ffffff',
+    surface: '#f8f8f8',
+    border: '#e4e4e4',
+    textPrimary: '#1a1a1a',
+    textSecondary: '#6a6a6a',
+    textMuted: '#9a9a9a',
+    footer: '#0d0d0d',
   },
 
   // ---- 联系方式 ----
   contact: {
-    editorEmail: 'editor@qidian.news',   // 投稿/爆料
-    bizEmail: 'biz@qidian.news',         // 商务合作
-    hrEmail: 'hr@qidian.news',           // 加入我们
+    editorEmail: 'editor@qidian.news',
+    bizEmail: 'biz@qidian.news',
+    hrEmail: 'hr@qidian.news',
   },
 
   // ---- 首页布局 ----
   homepage: {
-    showFeatured: true,           // 是否显示推荐大图
-    showFlashOnRight: true,       // 右侧是否显示快讯
-    flashCount: 6,                // 快讯显示条数
-    showContactCard: true,        // 是否显示联系卡片
+    showFeatured: true,
+    showFlashOnRight: true,
+    flashCount: 6,
+    showContactCard: true,
   },
 
-  // ---- 导航分类（增删改这里即可） ----
+  // ---- 导航分类（增删改这里） ----
   categories: [
     { slug: '24h-news', name: '24小时快讯' },
     { slug: 'retail-ecommerce', name: '零售电商' },
@@ -72,5 +74,4 @@ export const siteConfig = {
   },
 };
 
-// 导出便捷的颜色映射到 tailwind classes
 export const colorMap = siteConfig.colors;
