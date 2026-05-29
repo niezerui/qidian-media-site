@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import { siteConfig } from '@/lib/site.config';
 const c = siteConfig.colors;
@@ -56,10 +58,8 @@ export default function ArticleCard({ article, variant = 'default' }: ArticleCar
       <Link href={`/article/${article.slug}`} className="group block">
         <article className="flex gap-4 py-4 border-b" style={{ borderColor: c.border }}>
           <div className="flex-1 min-w-0">
-            <h3 className="text-base font-medium line-clamp-2 leading-snug transition-colors"
-              style={{ color: c.textPrimary }}
-              onMouseEnter={e => (e.currentTarget.style.color = c.accent)}
-              onMouseLeave={e => (e.currentTarget.style.color = c.textPrimary)}>{article.title}</h3>
+            <h3 className="text-base font-medium line-clamp-2 leading-snug group-hover:opacity-70 transition-opacity"
+              style={{ color: c.textPrimary }}>{article.title}</h3>
             <div className="flex items-center gap-3 mt-2 text-xs" style={{ color: c.textMuted }}>
               {article.category_name && <span>{article.category_name}</span>}<span>{formattedDate}</span>
             </div>
@@ -91,10 +91,8 @@ export default function ArticleCard({ article, variant = 'default' }: ArticleCar
               <span className="text-xs font-medium px-2.5 py-1 rounded-full text-white" style={{ backgroundColor: c.accent }}>独家</span>
             )}
           </div>
-          <h3 className="text-lg font-bold line-clamp-2 leading-snug mb-2 transition-colors"
-            style={{ color: c.textPrimary }}
-            onMouseEnter={e => (e.currentTarget.style.color = c.accent)}
-            onMouseLeave={e => (e.currentTarget.style.color = c.textPrimary)}>{article.title}</h3>
+          <h3 className="text-lg font-bold line-clamp-2 leading-snug mb-2 group-hover:opacity-70 transition-opacity"
+            style={{ color: c.textPrimary }}>{article.title}</h3>
           <p className="text-sm line-clamp-2 leading-relaxed mb-4" style={{ color: c.textSecondary }}>{article.summary}</p>
           <div className="flex items-center justify-between text-xs" style={{ color: c.textMuted }}>
             <div className="flex items-center gap-3"><span>{formattedDate}</span><span>{article.author}</span></div>
