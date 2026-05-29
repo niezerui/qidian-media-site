@@ -1,6 +1,7 @@
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ArticleCard from '@/components/ArticleCard';
+import BannerCarousel from '@/components/BannerCarousel';
 import Link from 'next/link';
 import { siteConfig } from '@/lib/site.config';
 import { query } from '@/lib/db';
@@ -56,30 +57,8 @@ export default async function HomePage({ searchParams }: { searchParams: { searc
             搜索 &ldquo;<b>{sq}</b>&rdquo; 的结果
           </div>}
 
-          {/* Banner */}
-          {!sq && banners.length > 0 && (
-            <div className="mb-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {banners.map((b: any, i: number) => (
-                  <Link key={b.id} href={`/article/${b.slug}`} className="group block rounded-xl overflow-hidden relative"
-                    style={{ backgroundColor: 'var(--c-surface)' }}>
-                    {b.cover_image && (
-                      <div className="aspect-[16/10] overflow-hidden">
-                        <img src={b.cover_image} alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                      </div>
-                    )}
-                    <div className={b.cover_image
-                      ? 'absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent'
-                      : 'p-4'}>
-                      {b.category_name && <span className="text-xs px-2 py-0.5 rounded-full mb-2 inline-block"
-                        style={{ backgroundColor: b.cover_image ? 'rgba(255,255,255,0.2)' : 'var(--c-surface)', color: b.cover_image ? '#fff' : 'var(--c-text-2)' }}>{b.category_name}</span>}
-                      <h2 className="text-lg font-bold leading-snug line-clamp-2" style={{ color: b.cover_image ? '#fff' : 'var(--c-text)' }}>{b.title}</h2>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Banner Carousel */}
+          {!sq && banners.length > 0 && <BannerCarousel items={banners} />}
 
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
             {/* LEFT: Articles (75%) */}

@@ -17,9 +17,13 @@ function parseArticle(a: any) {
 
 async function getCatData(slug: string) {
   try {
+    if (slug === '24h-news') {
+      const flashes = await query('SELECT * FROM flash_news ORDER BY published_at DESC LIMIT 50');
+      return { isFlash: true, flashes, total: flashes.length };
+    }
     const [articles, flashes] = await Promise.all([
       query(`SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE c.slug = ? ORDER BY a.published_at DESC LIMIT 20`, [slug]),
-      query('SELECT * FROM flash_news ORDER BY published_at DESC LIMIT 6'),
+      query('SELECT * FROM flash_news ORDER BY published_at DESC LIMIT 10'),
     ]);
     return { articles: articles.map(parseArticle), flashes, total: articles.length };
   } catch { return { articles: [], flashes: [], total: 0 }; }
@@ -34,10 +38,13 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 
 export default async function CategoryPage({ params }: { params: { slug: string } }) {
   const name = NAME_MAP[params.slug] || params.slug === '24h-news' ? '24小时快讯' : '';
-  const isFlash = params.slug === '24h-news';
-  if (!isFlash && !name) notFound();
+  const slugIsFlash = params.slug === '24h-news';
+  if (!slugIsFlash && !name) notFound();
 
-  const { articles, flashes } = await getCatData(params.slug);
+  const data = await getCatData(params.slug) as any;
+  const articles = data.articles || [];
+  const flashes = data.flashes || [];
+  const isFlash = slugIsFlash || data.isFlash;
 
   return (
     <>

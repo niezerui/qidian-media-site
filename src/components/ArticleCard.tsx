@@ -70,7 +70,10 @@ export default function ArticleCard({ article, variant = 'default' }: { article:
             {article.category_name && <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: 'var(--c-surface)', color: 'var(--c-text-2)' }}>{article.category_name}</span>}
             {article.is_exclusive && <span className="text-xs px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: 'var(--c-accent)' }}>独家</span>}
           </div>
-          <h3 className="text-base font-bold line-clamp-2 leading-snug" style={{ color: 'var(--c-text)' }}>{article.title}</h3>
+          <h3 className="text-base font-bold line-clamp-2 leading-snug" style={{ color: 'var(--c-text)' }}>
+            {article.is_exclusive && <span className="inline-block mr-1.5 text-xs font-bold px-1.5 py-0.5 rounded align-middle" style={{ backgroundColor: 'var(--c-accent)', color: '#fff' }}>独</span>}
+            {article.title}
+          </h3>
           <div className="flex items-center gap-3 text-xs mt-2" style={{ color: 'var(--c-text-3)' }}>
             <span>{article.author}</span><span>{date}</span>
           </div>
@@ -96,6 +99,7 @@ export default function ArticleCard({ article, variant = 'default' }: { article:
           {article.is_exclusive && <span className="text-xs px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: 'var(--c-accent)' }}>独家</span>}
         </div>
         <h3 className="text-base font-bold line-clamp-2 leading-snug mb-1.5 group-hover:opacity-70 transition-opacity" style={{ color: 'var(--c-text)' }}>
+          {article.is_exclusive && <span className="inline-block mr-1.5 text-xs font-bold px-1.5 py-0.5 rounded align-middle" style={{ backgroundColor: 'var(--c-accent)', color: '#fff' }}>独</span>}
           {article.title}
         </h3>
         {article.summary && (
