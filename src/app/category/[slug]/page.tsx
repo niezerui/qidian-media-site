@@ -10,7 +10,8 @@ siteConfig.categories.forEach(c => { CATEGORY_NAMES[c.slug] = c.name; });
 
 async function getCategoryData(slug: string) {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const vercelUrl = process.env.VERCEL_URL;
+    const baseUrl = vercelUrl ? `https://${vercelUrl}` : (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000');
     const [articlesRes, flashesRes] = await Promise.all([
       fetch(`${baseUrl}/api/articles?category=${slug}&pageSize=20`, { cache: 'no-store' }),
       fetch(`${baseUrl}/api/flashes?pageSize=${siteConfig.homepage.flashCount}`, { cache: 'no-store' }),

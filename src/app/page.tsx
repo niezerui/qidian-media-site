@@ -10,7 +10,9 @@ const NAV_CATEGORIES = ALL_CATEGORIES.filter(cat => cat.slug !== '24h-news');
 
 async function getHomeData(searchQuery?: string) {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    // Vercel 内部用 VERCEL_URL，本地用 localhost
+    const vercelUrl = process.env.VERCEL_URL;
+    const baseUrl = vercelUrl ? `https://${vercelUrl}` : (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000');
     const [featuredRes, articlesRes, flashesRes] = await Promise.all([
       fetch(`${baseUrl}/api/articles?featured=1&pageSize=5`, { cache: 'no-store' }),
       fetch(`${baseUrl}/api/articles?pageSize=12${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}`, { cache: 'no-store' }),

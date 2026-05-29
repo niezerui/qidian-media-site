@@ -5,7 +5,8 @@ import { notFound } from 'next/navigation';
 
 async function getFlashNews(id: string) {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const vercelUrl = process.env.VERCEL_URL;
+    const baseUrl = vercelUrl ? `https://${vercelUrl}` : (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000');
     const res = await fetch(`${baseUrl}/api/flashes?pageSize=100`, { cache: 'no-store' });
     const data = await res.json();
     if (data.success) {
