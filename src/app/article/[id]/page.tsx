@@ -1,18 +1,19 @@
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import ArticleCard from '@/components/ArticleCard';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { query, queryOne } from '@/lib/db';
 import { cleanContent, extractFirstImage } from '@/lib/security';
+import { siteConfig } from '@/lib/site.config';
 
 async function getArticle(slug: string) {
   try {
     const article = await queryOne(
-      `SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE a.slug = ?`,
-      [slug]
+      `SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE a.slug = ?`, [slug]
     ) as any;
     if (!article) return null;
+    article.content = cleanContent(article.content || '');
+    article.tags = JSON.parse(article.tags || '[]');
 
     const related = await query(
       `SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE a.category_id = ? AND a.id != ? ORDER BY a.published_at DESC LIMIT 3`,
@@ -20,151 +21,85 @@ async function getArticle(slug: string) {
     );
 
     return {
-      article: { ...article, tags: JSON.parse(article.tags || '[]'), is_featured: !!article.is_featured, is_exclusive: !!article.is_exclusive },
+      article,
       related: related.map((r: any) => ({ ...r, tags: JSON.parse(r.tags || '[]') })),
     };
   } catch { return null; }
 }
 
 export async function generateMetadata({ params }: { params: { id: string } }) {
-  // Extract slug from id param
-  const slug = params.id;
-  const data = await getArticle(slug);
-  if (!data) return { title: '文章未找到' };
-
-  return {
-    title: data.article.title,
-    description: data.article.summary,
-    openGraph: {
-      title: data.article.title,
-      description: data.article.summary,
-      type: 'article',
-      images: data.article.cover_image ? [data.article.cover_image] : [],
-    },
-  };
+  const data = await getArticle(params.id);
+  if (!data) return { title: '404' };
+  return { title: `${data.article.title} | ${siteConfig.name}`, description: data.article.summary || '' };
 }
 
 export default async function ArticleDetailPage({ params }: { params: { id: string } }) {
-  const slug = params.id;
-  const data = await getArticle(slug);
-
+  const data = await getArticle(params.id);
   if (!data) notFound();
 
   const { article, related } = data;
-  const formattedDate = new Date(article.published_at).toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  const date = new Date(article.published_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+  const coverImg = article.cover_image || extractFirstImage(article.content);
 
   return (
     <>
       <Header />
       <main className="flex-1">
-        <article className="content-container py-8">
+        <article className="site-container py-8">
           <div className="max-w-3xl mx-auto">
             {/* Breadcrumb */}
-            <nav className="flex items-center gap-2 text-sm text-brand-400 mb-6">
-              <Link href="/" className="hover:text-brand-900 transition-colors">首页</Link>
-              <span>/</span>
-              <Link href={`/category/${article.category_slug}`} className="hover:text-brand-900 transition-colors">
-                {article.category_name}
-              </Link>
-              <span>/</span>
-              <span className="text-brand-600 truncate max-w-[200px]">{article.title}</span>
+            <nav className="flex items-center gap-1.5 text-sm mb-6" style={{ color: 'var(--c-text-3)' }}>
+              <Link href="/" className="hover:underline">首页</Link><span>/</span>
+              <Link href={`/category/${article.category_slug}`} className="hover:underline">{article.category_name}</Link><span>/</span>
+              <span className="truncate max-w-[200px]" style={{ color: 'var(--c-text-2)' }}>{article.title}</span>
             </nav>
 
             {/* Tags */}
-            <div className="flex items-center gap-2 mb-4">
-              {article.is_exclusive && (
-                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-accent text-white">独家</span>
-              )}
-              {article.category_name && (
-                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-brand-100 text-brand-600">
-                  {article.category_name}
-                </span>
-              )}
+            <div className="flex items-center gap-2 mb-3">
+              {article.is_exclusive && <span className="text-xs px-2.5 py-0.5 rounded-full text-white" style={{ backgroundColor: 'var(--c-accent)' }}>独家</span>}
+              {article.category_name && <span className="text-xs px-2.5 py-0.5 rounded-full" style={{ backgroundColor: 'var(--c-surface)', color: 'var(--c-text-2)' }}>{article.category_name}</span>}
             </div>
 
             {/* Title */}
-            <h1 className="text-3xl sm:text-4xl font-bold text-brand-900 leading-tight mb-6">
-              {article.title}
-            </h1>
+            <h1 className="text-2xl sm:text-3xl font-bold leading-tight mb-4" style={{ color: 'var(--c-text)' }}>{article.title}</h1>
 
             {/* Meta */}
-            <div className="flex flex-wrap items-center gap-4 text-sm text-brand-400 pb-8 border-b border-brand-100 mb-8">
-              <span className="font-medium text-brand-600">{article.author}</span>
-              <span>{formattedDate}</span>
-              <span>{article.view_count} 阅读</span>
+            <div className="flex flex-wrap items-center gap-3 text-sm pb-6 border-b mb-6" style={{ borderColor: 'var(--c-border)', color: 'var(--c-text-3)' }}>
+              <span className="font-medium" style={{ color: 'var(--c-text-2)' }}>{article.author}</span>
+              <span>{date}</span>
+              {article.view_count > 0 && <span>{article.view_count} 阅读</span>}
             </div>
 
-            {/* Cover Image — 优先用设置的封面，没封面时自动提取文章第一张图 */}
-            {(article.cover_image || extractFirstImage(article.content)) && (
-              <div className="mb-10 rounded-xl overflow-hidden">
-                <img
-                  src={article.cover_image || extractFirstImage(article.content) || ''}
-                  alt={article.title}
-                  className="w-full object-cover"
-                />
+            {/* Cover */}
+            {coverImg && (
+              <div className="mb-8 rounded-xl overflow-hidden">
+                <img src={coverImg} alt={article.title} className="w-full object-cover" />
               </div>
             )}
 
-            {/* Content — 转义字符还原 */}
-            <div
-              className="article-body"
-              dangerouslySetInnerHTML={{ __html: cleanContent(article.content) }}
-            />
+            {/* Content */}
+            <div className="article-body" dangerouslySetInnerHTML={{ __html: article.content }} />
 
             {/* Tags */}
-            {article.tags && article.tags.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2 mt-12 pt-8 border-t border-brand-100">
-                {article.tags.map((tag: string) => (
-                  <span
-                    key={tag}
-                    className="px-3 py-1 text-xs text-brand-500 bg-brand-50 rounded-full"
-                  >
-                    #{tag}
-                  </span>
-                ))}
+            {article.tags.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-10 pt-6 border-t" style={{ borderColor: 'var(--c-border)' }}>
+                {article.tags.map((t: string) => <span key={t} className="px-3 py-1 text-xs rounded-full" style={{ backgroundColor: 'var(--c-surface)', color: 'var(--c-text-2)' }}>#{t}</span>)}
               </div>
             )}
-
-            {/* Share */}
-            <div className="flex items-center gap-4 mt-8 pt-8 border-t border-brand-100">
-              <span className="text-sm text-brand-400">分享到：</span>
-              <button className="p-2 rounded-full bg-brand-50 text-brand-600 hover:bg-brand-100 transition-colors" aria-label="分享到微信">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 01.213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 00.167-.054l1.903-1.114a.864.864 0 01.717-.098 10.16 10.16 0 002.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 01-1.162 1.178A1.17 1.17 0 014.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 01-1.162 1.178 1.17 1.17 0 01-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 01.598.082l1.584.926a.272.272 0 00.14.047c.134 0 .24-.111.24-.247 0-.06-.023-.12-.038-.177l-.327-1.233a.582.582 0 01-.023-.156.49.49 0 01.201-.398C23.024 18.48 24 16.82 24 14.98c0-3.21-2.931-5.952-7.062-6.122zm-2.18 2.769c.535 0 .969.44.969.982a.976.976 0 01-.969.983.976.976 0 01-.969-.983c0-.542.434-.982.97-.982zm4.844 0c.535 0 .969.44.969.982a.976.976 0 01-.969.983.976.976 0 01-.969-.983c0-.542.434-.982.97-.982z"/>
-                </svg>
-              </button>
-              <button className="p-2 rounded-full bg-brand-50 text-brand-600 hover:bg-brand-100 transition-colors" aria-label="分享到微博">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M20.194 14.197c0 3.858-4.851 6.986-10.835 6.986-2.158 0-4.172-.487-5.693-1.29.298.022.6.033.905.033 1.774 0 3.405-.553 4.698-1.482-1.656-.03-3.053-1.074-3.535-2.51.231.036.468.055.711.055.345 0 .68-.04 1-.115-1.731-.34-3.035-1.79-3.035-3.54v-.045c.51.27 1.093.433 1.713.452-1.015-.648-1.683-1.753-1.683-3.005 0-.662.187-1.282.512-1.815 1.865 2.184 4.652 3.622 7.796 3.772-.065-.264-.099-.54-.099-.823 0-1.995 1.693-3.613 3.78-3.613 1.088 0 2.07.439 2.76 1.142.861-.162 1.67-.463 2.4-.878-.282.843-.883 1.55-1.663 1.997.765-.087 1.494-.28 2.172-.567-.507.724-1.149 1.36-1.888 1.867.007.155.01.311.01.468z"/>
-                </svg>
-              </button>
-            </div>
-
-            {/* Author Card */}
-            <div className="mt-8 p-6 bg-brand-50 rounded-xl flex items-center gap-4">
-              <div className="w-12 h-12 bg-brand-900 rounded-full flex items-center justify-center text-white font-bold">
-                {article.author.charAt(0)}
-              </div>
-              <div>
-                <p className="text-sm font-medium text-brand-900">{article.author}</p>
-                <p className="text-xs text-brand-400">奇点编辑部</p>
-              </div>
-            </div>
           </div>
         </article>
 
-        {/* Related Articles */}
+        {/* Related */}
         {related.length > 0 && (
-          <section className="bg-brand-50 py-12">
-            <div className="content-container">
-              <h2 className="text-xl font-bold text-brand-900 mb-6">相关文章</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {related.map((article: any) => (
-                  <ArticleCard key={article.id} article={article} />
+          <section className="site-container pb-12">
+            <div className="max-w-3xl mx-auto">
+              <h2 className="text-lg font-bold mb-4 pt-6 border-t" style={{ borderColor: 'var(--c-border)', color: 'var(--c-text)' }}>相关文章</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {related.map((r: any) => (
+                  <Link key={r.id} href={`/article/${r.slug}`} className="group block bg-white rounded-lg border p-3 hover:shadow-sm transition-shadow" style={{ borderColor: 'var(--c-border)' }}>
+                    {r.cover_image && <div className="aspect-[16/9] rounded-md overflow-hidden mb-2" style={{ backgroundColor: 'var(--c-surface)' }}><img src={r.cover_image} alt="" className="w-full h-full object-cover" /></div>}
+                    <h3 className="text-sm font-medium line-clamp-2" style={{ color: 'var(--c-text)' }}>{r.title}</h3>
+                  </Link>
                 ))}
               </div>
             </div>

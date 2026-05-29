@@ -4,21 +4,18 @@ import ArticleCard from '@/components/ArticleCard';
 import Link from 'next/link';
 import { siteConfig } from '@/lib/site.config';
 
-const c = siteConfig.colors;
-const ALL_CATEGORIES = siteConfig.categories;
-const NAV_CATEGORIES = ALL_CATEGORIES.filter(cat => cat.slug !== '24h-news');
+const NAV_CATS = siteConfig.categories.filter(c => c.slug !== '24h-news');
 
-async function getHomeData(searchQuery?: string) {
+async function getHomeData(search?: string) {
   try {
-    const vercelUrl = process.env.VERCEL_URL;
-    const base = vercelUrl ? `https://${vercelUrl}` : 'http://localhost:3000';
+    const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000');
     const [fd, ad, fld] = await Promise.all([
       fetch(`${base}/api/articles?featured=1&pageSize=5`, { cache: 'no-store' }).then(r => r.json()),
-      fetch(`${base}/api/articles?pageSize=12${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}`, { cache: 'no-store' }).then(r => r.json()),
-      fetch(`${base}/api/flashes?pageSize=${siteConfig.homepage.flashCount}`, { cache: 'no-store' }).then(r => r.json()),
+      fetch(`${base}/api/articles?pageSize=12${search ? `&search=${encodeURIComponent(search)}` : ''}`, { cache: 'no-store' }).then(r => r.json()),
+      fetch(`${base}/api/flashes?pageSize=6`, { cache: 'no-store' }).then(r => r.json()),
     ]);
-    return { featured: fd.data || [], articles: ad.data || [], flashes: fld.data || [], total: ad.total || 0, searchQuery };
-  } catch { return { featured: [], articles: [], flashes: [], total: 0, searchQuery }; }
+    return { featured: fd.data || [], articles: ad.data || [], flashes: fld.data || [], search };
+  } catch { return { featured: [], articles: [], flashes: [], search }; }
 }
 
 export const dynamic = 'force-dynamic';
@@ -26,90 +23,85 @@ export const dynamic = 'force-dynamic';
 export default async function HomePage({ searchParams }: { searchParams: { search?: string } }) {
   const sq = searchParams.search;
   const { featured, articles, flashes } = await getHomeData(sq);
-  const mainFeatured = featured.length > 0 ? featured[0] : null;
+  const mainFeatured = featured[0];
   const subFeatured = featured.slice(1, 4);
 
   return (
     <>
       <Header />
       <main className="flex-1">
-        {/* ===== Category Navigation ===== */}
-        <div className="border-b" style={{ borderColor: c.border, backgroundColor: '#fff' }}>
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center gap-6 overflow-x-auto scrollbar-hide py-3">
-              <Link href="/" className="text-sm font-bold whitespace-nowrap pb-2 border-b-2 transition-colors"
-                style={{ color: c.textPrimary, borderColor: c.accent }}>
-                {siteConfig.name}推荐
-              </Link>
-              {NAV_CATEGORIES.map(cat => (
+        {/* Category Nav */}
+        <div className="border-b" style={{ borderColor: 'var(--c-border)' }}>
+          <div className="site-container py-2.5">
+            <div className="flex items-center gap-5 overflow-x-auto scrollbar-hide text-sm">
+              <Link href="/" className="font-bold whitespace-nowrap border-b-2 pb-1.5 transition-colors"
+                style={{ color: 'var(--c-text)', borderColor: 'var(--c-accent)' }}>推荐</Link>
+              {NAV_CATS.map(cat => (
                 <Link key={cat.slug} href={`/category/${cat.slug}`}
-                  className="text-sm whitespace-nowrap pb-2 border-b-2 border-transparent hover:border-current transition-colors"
-                  style={{ color: c.textSecondary }}>
-                  {cat.name}
-                </Link>
+                  className="whitespace-nowrap pb-1.5 border-b-2 border-transparent hover:border-current transition-colors"
+                  style={{ color: 'var(--c-text-2)' }}>{cat.name}</Link>
               ))}
             </div>
           </div>
         </div>
 
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {sq && <div className="mb-6 p-4 rounded-lg" style={{ backgroundColor: c.surface }}><p className="text-sm" style={{ color: c.textSecondary }}>搜索 &ldquo;<strong>{sq}</strong>&rdquo; 的结果</p></div>}
+        <div className="site-container py-6">
+          {sq && <div className="mb-6 p-3 rounded-lg text-sm" style={{ backgroundColor: 'var(--c-surface)', color: 'var(--c-text-2)' }}>
+            搜索 &ldquo;<b>{sq}</b>&rdquo; 的结果
+          </div>}
 
-          {/* ===== LAYOUT: Articles (75%) | Sidebar (25%) ===== */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            {/* ===== LEFT: Articles ===== */}
-            <div className="lg:col-span-3 space-y-8">
-              {!sq && mainFeatured && <ArticleCard article={mainFeatured} variant="featured" />}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
+            {/* LEFT: Articles */}
+            <div className="lg:col-span-3">
+              {!sq && mainFeatured && <div className="mb-6"><ArticleCard article={mainFeatured} variant="featured" /></div>}
               {!sq && subFeatured.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                   {subFeatured.map((a: any) => <ArticleCard key={a.id} article={a} variant="compact" />)}
                 </div>
               )}
 
-              <div className="flex items-center justify-between pt-4 border-t" style={{ borderColor: c.border }}>
-                <h2 className="text-xl font-bold" style={{ color: c.textPrimary }}>{sq ? '搜索结果' : '最新报道'}</h2>
+              <div className="flex items-center justify-between mb-4 pt-2 border-t" style={{ borderColor: 'var(--c-border)' }}>
+                <h2 className="text-lg font-bold" style={{ color: 'var(--c-text)' }}>{sq ? '搜索结果' : '最新报道'}</h2>
               </div>
 
               {articles.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   {articles.map((a: any) => <ArticleCard key={a.id} article={a} />)}
                 </div>
               ) : (
-                <div className="text-center py-16"><p className="text-lg" style={{ color: c.textMuted }}>{sq ? `没有找到与"${sq}"相关的结果` : '暂无内容'}</p></div>
+                <div className="text-center py-20" style={{ color: 'var(--c-text-3)' }}>
+                  {sq ? `没有找到与"${sq}"相关的内容` : '暂无内容'}
+                </div>
               )}
             </div>
 
-            {/* ===== RIGHT: Flash + Contact ===== */}
+            {/* RIGHT: Flash + Contact */}
             <aside className="lg:col-span-1 space-y-5">
-              <div className="rounded-xl p-5" style={{ backgroundColor: c.surface }}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: c.accent }} />
-                    <h2 className="text-sm font-bold" style={{ color: c.textPrimary }}>24小时快讯</h2>
+              {flashes.length > 0 && (
+                <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--c-surface)' }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: 'var(--c-accent)' }} />
+                      <h3 className="text-sm font-bold" style={{ color: 'var(--c-text)' }}>24小时快讯</h3>
+                    </div>
+                    <Link href="/category/24h-news" className="text-xs hover:underline" style={{ color: 'var(--c-text-3)' }}>全部</Link>
                   </div>
-                  <Link href="/category/24h-news" className="text-xs hover:opacity-70" style={{ color: c.textMuted }}>全部 →</Link>
+                  <div className="space-y-1">
+                    {flashes.slice(0, 6).map((f: any) => (
+                      <Link key={f.id} href={`/flash/${f.id}`} className="block py-1.5 border-b last:border-0 hover:opacity-70 transition-opacity text-xs"
+                        style={{ borderColor: 'var(--c-border)', color: 'var(--c-text-2)' }}>
+                        <span className="line-clamp-2">{f.title}</span>
+                      </Link>
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  {flashes.slice(0, siteConfig.homepage.flashCount).map((item: any) => (
-                    <Link key={item.id} href={`/flash/${item.id}`} className="block py-2 border-b last:border-0 hover:bg-white/40 -mx-1 px-1 rounded transition-colors" style={{ borderColor: c.border }}>
-                      <p className="text-xs line-clamp-2 leading-relaxed" style={{ color: c.textSecondary }}>{item.title}</p>
-                      <span className="text-[10px] mt-1 block" style={{ color: c.textMuted }}>{item.date_label || new Date(item.published_at).toLocaleDateString('zh-CN', { month:'short', day:'numeric' })}</span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
+              )}
 
-              <div className="rounded-xl p-5 text-white" style={{ backgroundColor: c.footer }}>
-                <h3 className="text-xs font-bold mb-2 uppercase tracking-wider opacity-70">联系{siteConfig.name}</h3>
-                <p className="text-xs leading-relaxed mb-3 opacity-70">{siteConfig.slogan}。欢迎投稿、爆料、商务合作。</p>
-                <div className="space-y-1.5 mb-3">
-                  <p className="text-xs opacity-60">{siteConfig.contact.editorEmail}</p>
-                  <p className="text-xs opacity-60">{siteConfig.contact.bizEmail}</p>
-                </div>
-                <Link href="/contact" className="inline-flex items-center gap-1.5 text-xs border border-white/30 rounded-md px-3 py-1.5 hover:bg-white/10 transition-colors">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                  发送消息
-                </Link>
+              <div className="rounded-xl p-4 text-white" style={{ backgroundColor: 'var(--c-primary)' }}>
+                <h3 className="text-sm font-bold mb-2">联系{siteConfig.name}</h3>
+                <p className="text-xs opacity-70 mb-3">{siteConfig.slogan}</p>
+                <p className="text-xs opacity-50 mb-1">{siteConfig.contact.editorEmail}</p>
+                <p className="text-xs opacity-50">{siteConfig.contact.bizEmail}</p>
               </div>
             </aside>
           </div>
