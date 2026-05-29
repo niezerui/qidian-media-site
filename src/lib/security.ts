@@ -103,3 +103,23 @@ export function validateFlashInput(data: any): string[] {
   }
   return errors;
 }
+
+// ===== Content Cleaner: 修复乱码"???"问题 =====
+// 富文本编辑器内容可能含JSON转义字符，渲染前需还原
+export function cleanContent(html: string): string {
+  if (!html) return '';
+  return html
+    .replace(/\\"/g, '"')       // JSON转义双引号
+    .replace(/\\n/g, '\n')      // \n 字面量 → 真实换行
+    .replace(/\\t/g, '\t')      // \t 字面量
+    .replace(/\\\\/g, '\\')     // 双反斜杠还原
+    .replace(/\\'/g, "'");      // 转义单引号
+}
+
+// 从文章内容中提取第一张图片URL作为封面
+export function extractFirstImage(html: string): string | null {
+  if (!html) return null;
+  const cleaned = cleanContent(html);
+  const match = cleaned.match(/<img[^>]+src=["']([^"']+)["']/i);
+  return match ? match[1] : null;
+}

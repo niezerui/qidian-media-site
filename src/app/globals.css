@@ -69,4 +69,39 @@
   .article-body pre code {
     @apply bg-transparent p-0;
   }
+
+  /* ===== Responsive improvements ===== */
+  .content-container {
+    @apply max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8;
+    width: 100%;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Mobile-optimized tables */
+  @media (max-width: 640px) {
+    .article-body {
+      font-size: 0.9375rem;
+    }
+    .article-body img,
+    .article-body video,
+    .article-body iframe {
+      margin-left: -1rem !important;
+      margin-right: -1rem !important;
+      width: calc(100% + 2rem) !important;
+      border-radius: 0 !important;
+    }
+  }
+
+  /* Print styles */
+  @media print {
+    header, footer, .sidebar { display: none !important; }
+    .article-body { max-width: 100% !important; }
+  }
 }

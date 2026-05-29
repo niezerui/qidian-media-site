@@ -4,6 +4,7 @@ import ArticleCard from '@/components/ArticleCard';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { query, queryOne } from '@/lib/db';
+import { cleanContent, extractFirstImage } from '@/lib/security';
 
 async function getArticle(slug: string) {
   try {
@@ -97,21 +98,21 @@ export default async function ArticleDetailPage({ params }: { params: { id: stri
               <span>{article.view_count} 阅读</span>
             </div>
 
-            {/* Cover Image */}
-            {article.cover_image && (
+            {/* Cover Image — 优先用设置的封面，没封面时自动提取文章第一张图 */}
+            {(article.cover_image || extractFirstImage(article.content)) && (
               <div className="mb-10 rounded-xl overflow-hidden">
                 <img
-                  src={article.cover_image}
+                  src={article.cover_image || extractFirstImage(article.content) || ''}
                   alt={article.title}
                   className="w-full object-cover"
                 />
               </div>
             )}
 
-            {/* Content */}
+            {/* Content — 转义字符还原 */}
             <div
               className="article-body"
-              dangerouslySetInnerHTML={{ __html: article.content }}
+              dangerouslySetInnerHTML={{ __html: cleanContent(article.content) }}
             />
 
             {/* Tags */}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryOne } from '@/lib/db';
+import { cleanContent } from '@/lib/security';
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,6 +24,7 @@ export async function GET(request: NextRequest) {
 
     const parsed = {
       ...article,
+      content: cleanContent((article as any).content || ''),
       tags: JSON.parse((article as any).tags || '[]'),
       is_featured: !!(article as any).is_featured,
       is_exclusive: !!(article as any).is_exclusive,

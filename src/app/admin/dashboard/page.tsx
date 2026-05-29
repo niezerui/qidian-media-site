@@ -31,6 +31,7 @@ export default function AdminDashboardPage() {
 
   // Category add
   const [showCatAdd, setShowCatAdd] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [newCatName, setNewCatName] = useState('');
 
   const fetchData = useCallback(async () => {
@@ -216,8 +217,32 @@ export default function AdminDashboardPage() {
                       <input type="text" value={articleForm.tags} onChange={e => setArticleForm({...articleForm, tags: e.target.value})} placeholder="AI, 大模型" className="w-full px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-brand-900 text-sm" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-brand-700 mb-1">封面图片URL</label>
-                      <input type="text" value={articleForm.cover_image} onChange={e => setArticleForm({...articleForm, cover_image: e.target.value})} placeholder="https://..." className="w-full px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-brand-900 text-sm" />
+                      <label className="block text-sm font-medium text-brand-700 mb-1">封面图片</label>
+                      <div className="flex gap-2">
+                        <input type="text" value={articleForm.cover_image} onChange={e => setArticleForm({...articleForm, cover_image: e.target.value})} placeholder="粘贴URL或上传图片" className="flex-1 px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-brand-900 text-sm" />
+                        <label className="px-3 py-2.5 border border-brand-200 rounded-lg text-xs text-brand-500 hover:bg-brand-50 cursor-pointer whitespace-nowrap flex items-center gap-1">
+                          📷 本地上传
+                          <input type="file" accept="image/*" onChange={async (e) => {
+                            const file = e.target.files?.[0]; if (!file) return;
+                            setUploading(true);
+                            try {
+                              const fd = new FormData(); fd.append('file', file); fd.append('type', 'image');
+                              const res = await fetch('/api/admin/upload', { method: 'POST', body: fd });
+                              const data = await res.json();
+                              if (data.success) setArticleForm(f => ({...f, cover_image: data.data.url}));
+                              else setError(data.error || '上传失败');
+                            } catch { setError('上传失败'); }
+                            finally { setUploading(false); }
+                          }} className="hidden" disabled={uploading} />
+                        </label>
+                      </div>
+                      {articleForm.cover_image && (
+                        <div className="mt-2 relative inline-block">
+                          <img src={articleForm.cover_image} alt="封面预览" className="h-20 rounded-lg border border-brand-200" />
+                          <button type="button" onClick={() => setArticleForm(f => ({...f, cover_image: ''}))} className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center">✕</button>
+                        </div>
+                      )}
+                      <p className="text-xs text-brand-400 mt-1">留空则自动提取文章第一张图片</p>
                     </div>
                   </div>
 

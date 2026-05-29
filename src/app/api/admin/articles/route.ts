@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne, execute } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
-import { sanitizeInput, sanitizeRichContent, validateArticleInput, generateSlug } from '@/lib/security';
+import { sanitizeInput, sanitizeRichContent, validateArticleInput, generateSlug, extractFirstImage } from '@/lib/security';
 
 export async function GET(request: NextRequest) {
   try {
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     const categoryId = parseInt(body.category_id);
     const author = sanitizeInput(body.author || '奇点编辑部');
     const tags = JSON.stringify((body.tags || []).map((t: string) => sanitizeInput(t)));
-    const coverImage = body.cover_image || null;
+    const coverImage = body.cover_image || extractFirstImage(body.content) || null;
     const isFeatured = body.is_featured ? 1 : 0;
     const isExclusive = body.is_exclusive ? 1 : 0;
     const publishedAt = body.published_at || new Date().toISOString();
@@ -109,7 +109,7 @@ export async function PUT(request: NextRequest) {
     const categoryId = parseInt(body.category_id);
     const author = sanitizeInput(body.author || '奇点编辑部');
     const tags = JSON.stringify((body.tags || []).map((t: string) => sanitizeInput(t)));
-    const coverImage = body.cover_image || null;
+    const coverImage = body.cover_image || extractFirstImage(body.content) || null;
     const isFeatured = body.is_featured ? 1 : 0;
     const isExclusive = body.is_exclusive ? 1 : 0;
 

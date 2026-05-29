@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
+import { cleanContent } from '@/lib/security';
 
 export async function GET(request: NextRequest) {
   try {
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest) {
 
     const parsed = articles.map((a: any) => ({
       ...a,
+      content: cleanContent(a.content || ''),
       tags: JSON.parse(a.tags || '[]'),
       is_featured: !!a.is_featured,
       is_exclusive: !!a.is_exclusive,
