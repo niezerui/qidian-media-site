@@ -3,18 +3,25 @@ import Footer from '@/components/Footer';
 import ArticleCard from '@/components/ArticleCard';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { query, queryOne } from '@/lib/db';
 
 async function getArticle(slug: string) {
   try {
-    const vercelUrl = process.env.VERCEL_URL;
-    const base = vercelUrl ? `https://${vercelUrl}` : 'http://localhost:3000';
-    const res = await fetch(`${base}/api/article?slug=${slug}`, { cache: 'no-store' }).then(r => r.json());
-    if (!res.success) return null;
+    const article = await queryOne(
+      `SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE a.slug = ?`,
+      [slug]
+    ) as any;
+    if (!article) return null;
 
-    const article = res.data;
-    const relatedRes = await fetch(`${base}/api/articles?category=${article.category_slug}&pageSize=4`, { cache: 'no-store' }).then(r => r.json());
-    const related = (relatedRes.data || []).filter((a: any) => a.id !== article.id).slice(0, 3);
-    return { article, related };
+    const related = await query(
+      `SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE a.category_id = ? AND a.id != ? ORDER BY a.published_at DESC LIMIT 3`,
+      [article.category_id, article.id]
+    );
+
+    return {
+      article: { ...article, tags: JSON.parse(article.tags || '[]'), is_featured: !!article.is_featured, is_exclusive: !!article.is_exclusive },
+      related: related.map((r: any) => ({ ...r, tags: JSON.parse(r.tags || '[]') })),
+    };
   } catch { return null; }
 }
 
