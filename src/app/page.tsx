@@ -126,11 +126,11 @@ export default async function HomePage({ searchParams }: { searchParams: { searc
                 </div>
               )}
 
-              <div className="rounded-xl p-4 text-white" style={{ backgroundColor: 'var(--c-primary)' }}>
-                <h3 className="text-sm font-bold mb-2">联系{siteConfig.name}</h3>
-                <p className="text-xs opacity-70 mb-3 leading-relaxed">{siteConfig.slogan}</p>
-                <p className="text-xs opacity-50">{siteConfig.contact.editorEmail}</p>
-                <p className="text-xs opacity-50">{siteConfig.contact.bizEmail}</p>
+              <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--c-surface)' }}>
+                <h3 className="text-sm font-bold mb-2 pb-2" style={{ color: 'var(--c-text)', borderBottom: '2px solid var(--c-primary)' }}>联系{siteConfig.name}</h3>
+                <p className="text-xs leading-relaxed mb-2" style={{ color: 'var(--c-text-2)' }}>{siteConfig.slogan}</p>
+                <p className="text-xs" style={{ color: 'var(--c-text-3)' }}>{siteConfig.contact.editorEmail}</p>
+                <p className="text-xs" style={{ color: 'var(--c-text-3)' }}>{siteConfig.contact.bizEmail}</p>
               </div>
             </aside>
           </div>
