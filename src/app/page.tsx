@@ -3,6 +3,7 @@ import Footer from '@/components/Footer';
 import ArticleCard from '@/components/ArticleCard';
 import Link from 'next/link';
 import { siteConfig } from '@/lib/site.config';
+import { getArticles, getFlashes } from '@/lib/data';
 
 const c = siteConfig.colors;
 const ALL_CATEGORIES = siteConfig.categories;
@@ -10,20 +11,17 @@ const NAV_CATEGORIES = ALL_CATEGORIES.filter(cat => cat.slug !== '24h-news');
 
 async function getHomeData(searchQuery?: string) {
   try {
-    // Vercel 内部用 VERCEL_URL，本地用 localhost
-    const vercelUrl = process.env.VERCEL_URL;
-    const baseUrl = vercelUrl ? `https://${vercelUrl}` : (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000');
     const [featuredRes, articlesRes, flashesRes] = await Promise.all([
-      fetch(`${baseUrl}/api/articles?featured=1&pageSize=5`, { cache: 'no-store' }),
-      fetch(`${baseUrl}/api/articles?pageSize=12${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}`, { cache: 'no-store' }),
-      fetch(`${baseUrl}/api/flashes?pageSize=${siteConfig.homepage.flashCount}`, { cache: 'no-store' }),
+      getArticles({ featured: '1', pageSize: 5 }),
+      getArticles({ pageSize: 12, search: searchQuery }),
+      getFlashes({ pageSize: siteConfig.homepage.flashCount }),
     ]);
-    const [fd, ad, fld] = await Promise.all([featuredRes.json(), articlesRes.json(), flashesRes.json()]);
     return {
-      featured: fd.success ? fd.data : [],
-      articles: ad.success ? ad.data : [],
-      flashes: fld.success ? fld.data : [],
-      total: ad.total || 0, searchQuery,
+      featured: featuredRes.data,
+      articles: articlesRes.data,
+      flashes: flashesRes.data,
+      total: articlesRes.total,
+      searchQuery,
     };
   } catch {
     return { featured: [], articles: [], flashes: [], total: 0, searchQuery };

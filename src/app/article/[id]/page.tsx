@@ -3,33 +3,12 @@ import Footer from '@/components/Footer';
 import ArticleCard from '@/components/ArticleCard';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getArticleBySlug } from '@/lib/data';
 
 async function getArticle(slug: string) {
   try {
-    const vercelUrl = process.env.VERCEL_URL;
-    const baseUrl = vercelUrl ? `https://${vercelUrl}` : (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000');
-    const res = await fetch(`${baseUrl}/api/articles?pageSize=1`, { cache: 'no-store' });
-    const data = await res.json();
-
-    if (data.success) {
-      const article = data.data.find((a: any) => a.slug === slug);
-      if (article) {
-        // Get related articles
-        const relatedRes = await fetch(
-          `${baseUrl}/api/articles?category=${article.category_slug}&pageSize=4`,
-          { cache: 'no-store' }
-        );
-        const relatedData = await relatedRes.json();
-        return {
-          article,
-          related: relatedData.success
-            ? relatedData.data.filter((a: any) => a.id !== article.id).slice(0, 3)
-            : [],
-        };
-      }
-    }
-    return null;
-  } catch (error) {
+    return await getArticleBySlug(slug);
+  } catch {
     return null;
   }
 }

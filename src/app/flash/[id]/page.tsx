@@ -2,18 +2,12 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getFlashById } from '@/lib/data';
 
 async function getFlashNews(id: string) {
   try {
-    const vercelUrl = process.env.VERCEL_URL;
-    const baseUrl = vercelUrl ? `https://${vercelUrl}` : (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000');
-    const res = await fetch(`${baseUrl}/api/flashes?pageSize=100`, { cache: 'no-store' });
-    const data = await res.json();
-    if (data.success) {
-      return data.data.find((f: any) => f.id === parseInt(id)) || null;
-    }
-    return null;
-  } catch (error) {
+    return await getFlashById(parseInt(id));
+  } catch {
     return null;
   }
 }
