@@ -6,20 +6,20 @@ export const siteConfig = {
   // ---- 品牌 ----
   name: '奇点',
   tagline: 'QIDIAN',
-  slogan: '聚焦AI、科技与商业的深度媒体平台',
+  slogan: '用有趣、好玩的视角，看科技，看人文，找寻时代奇点',
   description: '记录智能时代的每一次突破',
 
   // ---- Logo（可改为图片URL） ----
   logo: {
-    type: 'text' as 'text' | 'image',  // 'text' 显示文字logo, 'image' 显示图片
-    text: '奇',                          // 文字logo显示的字
-    imageUrl: '/logo.png',              // 图片logo的路径（type='image'时生效）
+    type: 'image' as 'text' | 'image',  // 你已改为图片模式
+    text: '奇',                          // type='text'时的文字
+    imageUrl: '/logo.png',              // 图片路径 → 把logo图片放到 public/logo.png
   },
 
   // ---- 配色 ----
   colors: {
-    primary: '#1a1a1a',       // 主色（导航、按钮、标题）
-    accent: '#c41e3a',        // 强调色（链接、标签、快讯圆点）
+    primary: '#121212',       // 主色（导航、按钮、标题）
+    accent: '#f4d933',        // 强调色（链接、标签、快讯圆点）
     background: '#ffffff',    // 页面背景
     surface: '#f8f8f8',       // 卡片背景
     border: '#e4e4e4',       // 边框
@@ -66,7 +66,7 @@ export const siteConfig = {
 
   // ---- SEO ----
   seo: {
-    defaultTitle: '奇点 - 科技与商业深度报道',
+    defaultTitle: '奇点 - 用有趣、好玩的视角，看科技，看人文，找寻时代奇点',
     titleTemplate: '%s | 奇点',
     keywords: ['AI', '人工智能', '大模型', '具身智能', '科技', '商业'],
   },

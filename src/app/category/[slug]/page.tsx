@@ -42,9 +42,9 @@ export default async function CategoryPage({ params }: { params: { slug: string 
           </div>
         </div>
 
-        <div className="content-container py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2">
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <div className="lg:col-span-3">
               {articles.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   {articles.map((article: any) => <ArticleCard key={article.id} article={article} />)}
