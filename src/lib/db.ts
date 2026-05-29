@@ -26,55 +26,29 @@ export async function ensureInit(): Promise<void> {
 
   const db = getDb();
 
-  await db.executeMultiple(`
-    CREATE TABLE IF NOT EXISTS categories (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      slug TEXT NOT NULL UNIQUE,
-      name TEXT NOT NULL,
-      description TEXT DEFAULT '',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
+  // 逐条执行建表（HTTP模式不支持executeMultiple）
+  const tables = [
+    `CREATE TABLE IF NOT EXISTS categories (id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL, description TEXT DEFAULT '', created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`,
+    `CREATE TABLE IF NOT EXISTS articles (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, summary TEXT DEFAULT '', content TEXT DEFAULT '', cover_image TEXT, category_id INTEGER NOT NULL, author TEXT DEFAULT '奇点编辑部', tags TEXT DEFAULT '[]', is_featured INTEGER DEFAULT 0, is_exclusive INTEGER DEFAULT 0, view_count INTEGER DEFAULT 0, published_at DATETIME DEFAULT CURRENT_TIMESTAMP, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (category_id) REFERENCES categories(id))`,
+    `CREATE TABLE IF NOT EXISTS flash_news (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, content TEXT DEFAULT '', date_label TEXT DEFAULT '', published_at DATETIME DEFAULT CURRENT_TIMESTAMP, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`,
+    `CREATE TABLE IF NOT EXISTS admin_users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`,
+  ];
 
-    CREATE TABLE IF NOT EXISTS articles (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
-      slug TEXT NOT NULL UNIQUE,
-      summary TEXT DEFAULT '',
-      content TEXT DEFAULT '',
-      cover_image TEXT,
-      category_id INTEGER NOT NULL,
-      author TEXT DEFAULT '奇点编辑部',
-      tags TEXT DEFAULT '[]',
-      is_featured INTEGER DEFAULT 0,
-      is_exclusive INTEGER DEFAULT 0,
-      view_count INTEGER DEFAULT 0,
-      published_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (category_id) REFERENCES categories(id)
-    );
+  for (const sql of tables) {
+    await db.execute(sql);
+  }
 
-    CREATE TABLE IF NOT EXISTS flash_news (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
-      content TEXT DEFAULT '',
-      date_label TEXT DEFAULT '',
-      published_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
+  // Indexes (may fail if already exist, safe to retry)
+  const indexes = [
+    `CREATE INDEX IF NOT EXISTS idx_articles_category ON articles(category_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_articles_published ON articles(published_at)`,
+    `CREATE INDEX IF NOT EXISTS idx_articles_featured ON articles(is_featured)`,
+    `CREATE INDEX IF NOT EXISTS idx_flash_news_published ON flash_news(published_at)`,
+  ];
 
-    CREATE TABLE IF NOT EXISTS admin_users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_articles_category ON articles(category_id);
-    CREATE INDEX IF NOT EXISTS idx_articles_published ON articles(published_at);
-    CREATE INDEX IF NOT EXISTS idx_articles_featured ON articles(is_featured);
-    CREATE INDEX IF NOT EXISTS idx_flash_news_published ON flash_news(published_at);
-  `);
+  for (const sql of indexes) {
+    try { await db.execute(sql); } catch {}
+  }
 
   // Seed default categories (INSERT OR IGNORE)
   const categories = [
