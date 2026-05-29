@@ -1,18 +1,10 @@
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ArticleCard from '@/components/ArticleCard';
-import FlashNews from '@/components/FlashNews';
 import Link from 'next/link';
+import { siteConfig } from '@/lib/site.config';
 
-const CATEGORIES = [
-  { slug: 'retail-ecommerce', name: '零售电商' },
-  { slug: 'mobile-digital', name: '手机数码' },
-  { slug: 'ai-llm', name: 'AI大模型' },
-  { slug: 'embodied-ai', name: '具身智能' },
-  { slug: 'ai-hardware', name: 'AI硬件' },
-  { slug: 'ai-applications', name: 'AI应用' },
-  { slug: 'ip-gaming', name: 'IP游戏' },
-];
+const CATEGORIES = siteConfig.categories.filter(c => c.slug !== '24h-news');
 
 async function getHomeData(searchQuery?: string) {
   try {
@@ -20,7 +12,7 @@ async function getHomeData(searchQuery?: string) {
     const [featuredRes, articlesRes, flashesRes] = await Promise.all([
       fetch(`${baseUrl}/api/articles?featured=1&pageSize=5`, { cache: 'no-store' }),
       fetch(`${baseUrl}/api/articles?pageSize=12${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}`, { cache: 'no-store' }),
-      fetch(`${baseUrl}/api/flashes?pageSize=8`, { cache: 'no-store' }),
+      fetch(`${baseUrl}/api/flashes?pageSize=${siteConfig.homepage.flashCount}`, { cache: 'no-store' }),
     ]);
     const [featuredData, articlesData, flashesData] = await Promise.all([
       featuredRes.json(), articlesRes.json(), flashesRes.json(),
@@ -113,13 +105,13 @@ export default async function HomePage({ searchParams }: { searchParams: { searc
 
               {/* Contact Info */}
               <div className="bg-brand-900 rounded-xl p-5 text-white">
-                <h3 className="text-xs font-bold mb-2 uppercase tracking-wider opacity-70">联系奇点</h3>
+                <h3 className="text-xs font-bold mb-2 uppercase tracking-wider opacity-70">联系{siteConfig.name}</h3>
                 <p className="text-xs text-brand-300 leading-relaxed mb-3">
-                  聚焦AI、科技与商业的深度媒体平台。欢迎投稿、爆料、商务合作。
+                  {siteConfig.slogan}。欢迎投稿、爆料、商务合作。
                 </p>
                 <div className="space-y-1.5 mb-3">
-                  <p className="text-xs text-brand-400">📧 editor@qidian.news</p>
-                  <p className="text-xs text-brand-400">🤝 biz@qidian.news</p>
+                  <p className="text-xs text-brand-400">{siteConfig.contact.editorEmail}</p>
+                  <p className="text-xs text-brand-400">{siteConfig.contact.bizEmail}</p>
                 </div>
                 <Link href="/contact" className="inline-flex items-center gap-1.5 text-xs text-white border border-white/30 rounded-md px-3 py-1.5 hover:bg-white/10 transition-colors">
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>

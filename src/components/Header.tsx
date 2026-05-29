@@ -3,17 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { siteConfig } from '@/lib/site.config';
 
-const CATEGORIES = [
-  { slug: '24h-news', name: '24小时快讯' },
-  { slug: 'retail-ecommerce', name: '零售电商' },
-  { slug: 'mobile-digital', name: '手机数码' },
-  { slug: 'ai-llm', name: 'AI大模型' },
-  { slug: 'embodied-ai', name: '具身智能' },
-  { slug: 'ai-hardware', name: 'AI硬件' },
-  { slug: 'ai-applications', name: 'AI应用' },
-  { slug: 'ip-gaming', name: 'IP游戏' },
-];
+const CATEGORIES = siteConfig.categories;
 
 export default function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -37,11 +29,11 @@ export default function Header() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
             <div className="w-8 h-8 bg-brand-900 rounded-lg flex items-center justify-center group-hover:bg-accent transition-colors">
-              <span className="text-white font-bold text-sm">奇</span>
+              <span className="text-white font-bold text-sm">{siteConfig.logo.text}</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-xl font-bold text-brand-900 leading-tight tracking-tight">奇点</span>
-              <span className="text-[10px] text-brand-400 leading-tight">QIDIAN</span>
+              <span className="text-xl font-bold text-brand-900 leading-tight tracking-tight">{siteConfig.name}</span>
+              <span className="text-[10px] text-brand-400 leading-tight">{siteConfig.tagline}</span>
             </div>
           </Link>
 
