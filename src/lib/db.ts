@@ -12,7 +12,10 @@ export function getDb(): Client {
       throw new Error('Missing TURSO_DATABASE_URL or TURSO_AUTH_TOKEN environment variables');
     }
 
-    client = createClient({ url, authToken });
+    // Vercel Serverless 不支持 libsql:// WebSocket 协议，必须用 https://
+    const httpUrl = url.replace('libsql://', 'https://');
+
+    client = createClient({ url: httpUrl, authToken });
   }
   return client;
 }
