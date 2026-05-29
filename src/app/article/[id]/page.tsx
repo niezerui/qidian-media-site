@@ -8,16 +8,13 @@ async function getArticle(slug: string) {
   try {
     const vercelUrl = process.env.VERCEL_URL;
     const base = vercelUrl ? `https://${vercelUrl}` : 'http://localhost:3000';
-    const data = await fetch(`${base}/api/articles?pageSize=100`, { cache: 'no-store' }).then(r => r.json());
-    if (data.success) {
-      const article = data.data.find((a: any) => a.slug === slug);
-      if (article) {
-        const relatedData = await fetch(`${base}/api/articles?category=${article.category_slug}&pageSize=4`, { cache: 'no-store' }).then(r => r.json());
-        const related = relatedData.success ? relatedData.data.filter((a: any) => a.id !== article.id).slice(0, 3) : [];
-        return { article, related };
-      }
-    }
-    return null;
+    const res = await fetch(`${base}/api/article?slug=${slug}`, { cache: 'no-store' }).then(r => r.json());
+    if (!res.success) return null;
+
+    const article = res.data;
+    const relatedRes = await fetch(`${base}/api/articles?category=${article.category_slug}&pageSize=4`, { cache: 'no-store' }).then(r => r.json());
+    const related = (relatedRes.data || []).filter((a: any) => a.id !== article.id).slice(0, 3);
+    return { article, related };
   } catch { return null; }
 }
 
