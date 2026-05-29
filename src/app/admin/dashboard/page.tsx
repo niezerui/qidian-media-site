@@ -22,7 +22,7 @@ export default function AdminDashboardPage() {
   const [articleForm, setArticleForm] = useState({
     title: '', summary: '', content: '', category_id: '',
     author: '奇点编辑部', tags: '', cover_image: '',
-    is_featured: false, is_exclusive: false, is_pinned: false,
+    is_featured: false, is_exclusive: false, is_pinned: false, is_banner: false,
   });
 
   // Flash form
@@ -83,6 +83,7 @@ export default function AdminDashboardPage() {
         ...articleForm, tags,
         category_id: parseInt(articleForm.category_id),
         is_featured: articleForm.is_featured || articleForm.is_pinned,
+        is_banner: articleForm.is_banner,
       };
       if (editingArticle) body.id = editingArticle.id;
 
@@ -103,14 +104,14 @@ export default function AdminDashboardPage() {
       category_id: String(article.category_id || ''), author: article.author || '奇点编辑部',
       tags: (article.tags || []).join(', '), cover_image: article.cover_image || '',
       is_featured: article.is_featured || false, is_exclusive: article.is_exclusive || false,
-      is_pinned: article.is_featured || false,
+      is_pinned: article.is_featured || false, is_banner: article.is_banner || false,
     });
     setShowArticleForm(true);
   };
 
   const resetArticleForm = () => {
     setEditingArticle(null);
-    setArticleForm({ title: '', summary: '', content: '', category_id: '', author: '奇点编辑部', tags: '', cover_image: '', is_featured: false, is_exclusive: false, is_pinned: false });
+    setArticleForm({ title: '', summary: '', content: '', category_id: '', author: '奇点编辑部', tags: '', cover_image: '', is_featured: false, is_exclusive: false, is_pinned: false, is_banner: false });
     setShowArticleForm(false);
   };
 
@@ -257,6 +258,11 @@ export default function AdminDashboardPage() {
                       <input type="checkbox" checked={articleForm.is_exclusive} onChange={e => setArticleForm({...articleForm, is_exclusive: e.target.checked})} className="rounded border-brand-300 w-4 h-4 accent-red-500" />
                       <span className="font-medium">🔴 独家标记</span>
                       <span className="text-xs text-brand-400">（显示独家标签）</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-brand-700 cursor-pointer">
+                      <input type="checkbox" checked={articleForm.is_banner} onChange={e => setArticleForm({...articleForm, is_banner: e.target.checked})} className="rounded border-brand-300 w-4 h-4 accent-blue-500" />
+                      <span className="font-medium">🎬 首页Banner</span>
+                      <span className="text-xs text-brand-400">（最多显示5个，前端展示前3个）</span>
                     </label>
                   </div>
 

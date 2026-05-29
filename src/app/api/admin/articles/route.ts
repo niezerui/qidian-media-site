@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
       tags: JSON.parse(a.tags || '[]'),
       is_featured: !!a.is_featured,
       is_exclusive: !!a.is_exclusive,
+      is_banner: !!a.is_banner,
     }));
 
     return NextResponse.json({
@@ -71,12 +72,13 @@ export async function POST(request: NextRequest) {
     const coverImage = body.cover_image || extractFirstImage(body.content) || null;
     const isFeatured = body.is_featured ? 1 : 0;
     const isExclusive = body.is_exclusive ? 1 : 0;
+    const isBanner = body.is_banner ? 1 : 0;
     const publishedAt = body.published_at || new Date().toISOString();
 
     const result = await execute(
-      `INSERT INTO articles (title, slug, summary, content, cover_image, category_id, author, tags, is_featured, is_exclusive, published_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [title, slug, summary, content, coverImage, categoryId, author, tags, isFeatured, isExclusive, publishedAt]
+      `INSERT INTO articles (title, slug, summary, content, cover_image, category_id, author, tags, is_featured, is_exclusive, is_banner, published_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [title, slug, summary, content, coverImage, categoryId, author, tags, isFeatured, isExclusive, isBanner, publishedAt]
     );
 
     const article = await queryOne('SELECT * FROM articles WHERE id = ?', [result.lastInsertRowid]);
@@ -112,12 +114,13 @@ export async function PUT(request: NextRequest) {
     const coverImage = body.cover_image || extractFirstImage(body.content) || null;
     const isFeatured = body.is_featured ? 1 : 0;
     const isExclusive = body.is_exclusive ? 1 : 0;
+    const isBanner = body.is_banner ? 1 : 0;
 
     await execute(
       `UPDATE articles
-       SET title = ?, summary = ?, content = ?, cover_image = ?, category_id = ?, author = ?, tags = ?, is_featured = ?, is_exclusive = ?, updated_at = CURRENT_TIMESTAMP
+       SET title = ?, summary = ?, content = ?, cover_image = ?, category_id = ?, author = ?, tags = ?, is_featured = ?, is_exclusive = ?, is_banner = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
-      [title, summary, content, coverImage, categoryId, author, tags, isFeatured, isExclusive, body.id]
+      [title, summary, content, coverImage, categoryId, author, tags, isFeatured, isExclusive, isBanner, body.id]
     );
 
     const article = await queryOne('SELECT * FROM articles WHERE id = ?', [body.id]);
