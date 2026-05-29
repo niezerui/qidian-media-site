@@ -1,29 +1,29 @@
-import Database from 'better-sqlite3';
-import path from 'path';
+import { createClient, type Client } from '@libsql/client';
 
-const DB_PATH = path.join(process.cwd(), 'data', 'media.db');
+let client: Client | null = null;
+let initialized = false;
 
-let db: Database.Database | null = null;
+export function getDb(): Client {
+  if (!client) {
+    const url = process.env.TURSO_DATABASE_URL;
+    const authToken = process.env.TURSO_AUTH_TOKEN;
 
-export function getDb(): Database.Database {
-  if (!db) {
-    // Ensure data directory exists
-    const fs = require('fs');
-    const dir = path.dirname(DB_PATH);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+    if (!url || !authToken) {
+      throw new Error('Missing TURSO_DATABASE_URL or TURSO_AUTH_TOKEN environment variables');
     }
 
-    db = new Database(DB_PATH);
-    db.pragma('journal_mode = WAL');
-    db.pragma('foreign_keys = ON');
-    initTables(db);
+    client = createClient({ url, authToken });
   }
-  return db;
+  return client;
 }
 
-function initTables(db: Database.Database): void {
-  db.exec(`
+// Run once on first request to ensure tables exist
+export async function ensureInit(): Promise<void> {
+  if (initialized) return;
+
+  const db = getDb();
+
+  await db.executeMultiple(`
     CREATE TABLE IF NOT EXISTS categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       slug TEXT NOT NULL UNIQUE,
@@ -73,11 +73,7 @@ function initTables(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_flash_news_published ON flash_news(published_at);
   `);
 
-  // Seed default categories
-  const insertCategory = db.prepare(
-    'INSERT OR IGNORE INTO categories (slug, name, description) VALUES (?, ?, ?)'
-  );
-
+  // Seed default categories (INSERT OR IGNORE)
   const categories = [
     ['24h-news', '24小时快讯', '最新最快的行业资讯'],
     ['retail-ecommerce', '零售电商', '零售与电商行业动态'],
@@ -89,26 +85,54 @@ function initTables(db: Database.Database): void {
     ['ip-gaming', 'IP游戏', '游戏与IP产业动态'],
   ];
 
-  const seedAll = db.transaction(() => {
-    for (const cat of categories) {
-      insertCategory.run(...cat);
-    }
-  });
-  seedAll();
+  for (const [slug, name, description] of categories) {
+    await db.execute({
+      sql: 'INSERT OR IGNORE INTO categories (slug, name, description) VALUES (?, ?, ?)',
+      args: [slug, name, description],
+    });
+  }
 
-  // Seed default admin (username: admin, password: admin123)
-  const existingAdmin = db.prepare('SELECT id FROM admin_users WHERE username = ?').get('admin');
-  if (!existingAdmin) {
+  // Seed default admin
+  const existing = await db.execute({
+    sql: 'SELECT id FROM admin_users WHERE username = ?',
+    args: ['admin'],
+  });
+
+  if (existing.rows.length === 0) {
     const bcrypt = require('bcryptjs');
     const hash = bcrypt.hashSync('admin123', 10);
-    db.prepare('INSERT INTO admin_users (username, password_hash) VALUES (?, ?)').run('admin', hash);
+    await db.execute({
+      sql: 'INSERT INTO admin_users (username, password_hash) VALUES (?, ?)',
+      args: ['admin', hash],
+    });
   }
+
+  initialized = true;
 }
 
-// Close DB connection (for scripts)
-export function closeDb(): void {
-  if (db) {
-    db.close();
-    db = null;
-  }
+// Helper: execute a query and return rows
+export async function query(sql: string, args: any[] = []): Promise<any[]> {
+  await ensureInit();
+  const db = getDb();
+  const result = await db.execute({ sql, args });
+  return result.rows;
+}
+
+// Helper: execute a query and return first row
+export async function queryOne(sql: string, args: any[] = []): Promise<any | null> {
+  await ensureInit();
+  const db = getDb();
+  const result = await db.execute({ sql, args });
+  return result.rows[0] || null;
+}
+
+// Helper: execute an insert/update/delete
+export async function execute(sql: string, args: any[] = []): Promise<{ lastInsertRowid: number | bigint; rowsAffected: number }> {
+  await ensureInit();
+  const db = getDb();
+  const result = await db.execute({ sql, args });
+  return {
+    lastInsertRowid: result.lastInsertRowid ?? 0,
+    rowsAffected: result.rowsAffected,
+  };
 }

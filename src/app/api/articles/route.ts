@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { query, queryOne } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,7 +10,6 @@ export async function GET(request: NextRequest) {
     const featured = searchParams.get('featured');
     const search = searchParams.get('search') || '';
 
-    const db = getDb();
     let whereClause = 'WHERE 1=1';
     const params: any[] = [];
 
@@ -34,7 +33,8 @@ export async function GET(request: NextRequest) {
       JOIN categories c ON a.category_id = c.id
       ${whereClause}
     `;
-    const { total } = db.prepare(countSql).get(...params) as { total: number };
+    const countRow = await queryOne(countSql, params);
+    const total = countRow?.total ?? 0;
 
     const offset = (page - 1) * pageSize;
     const dataSql = `
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
       LIMIT ? OFFSET ?
     `;
 
-    const articles = db.prepare(dataSql).all(...params, pageSize, offset) as any[];
+    const articles = await query(dataSql, [...params, pageSize, offset]);
 
     const parsed = articles.map((a: any) => ({
       ...a,

@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { query, queryOne, execute } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { sanitizeInput, sanitizeRichContent, validateFlashInput } from '@/lib/security';
 
 export async function GET() {
   try {
     await requireAuth();
-    const db = getDb();
-    const flashes = db.prepare('SELECT * FROM flash_news ORDER BY created_at DESC LIMIT 100').all();
+    const flashes = await query('SELECT * FROM flash_news ORDER BY created_at DESC LIMIT 100');
     return NextResponse.json({ success: true, data: flashes });
   } catch (error: any) {
     if (error.message === 'Unauthorized') {
@@ -27,17 +26,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: errors.join(', ') }, { status: 400 });
     }
 
-    const db = getDb();
     const title = sanitizeInput(body.title.trim());
     const content = sanitizeRichContent(body.content || '');
     const dateLabel = sanitizeInput(body.date_label || '');
     const publishedAt = body.published_at || new Date().toISOString();
 
-    const result = db.prepare(
-      'INSERT INTO flash_news (title, content, date_label, published_at) VALUES (?, ?, ?, ?)'
-    ).run(title, content, dateLabel, publishedAt);
+    const result = await execute(
+      'INSERT INTO flash_news (title, content, date_label, published_at) VALUES (?, ?, ?, ?)',
+      [title, content, dateLabel, publishedAt]
+    );
 
-    const flash = db.prepare('SELECT * FROM flash_news WHERE id = ?').get(result.lastInsertRowid);
+    const flash = await queryOne('SELECT * FROM flash_news WHERE id = ?', [result.lastInsertRowid]);
     return NextResponse.json({ success: true, data: flash }, { status: 201 });
   } catch (error: any) {
     if (error.message === 'Unauthorized') {
@@ -55,8 +54,7 @@ export async function DELETE(request: NextRequest) {
     if (!id) {
       return NextResponse.json({ success: false, error: '缺少快讯ID' }, { status: 400 });
     }
-    const db = getDb();
-    db.prepare('DELETE FROM flash_news WHERE id = ?').run(id);
+    await execute('DELETE FROM flash_news WHERE id = ?', [id]);
     return NextResponse.json({ success: true, message: '删除成功' });
   } catch (error: any) {
     if (error.message === 'Unauthorized') {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { query, queryOne } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,14 +7,14 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
     const pageSize = Math.min(50, Math.max(1, parseInt(searchParams.get('pageSize') || '20')));
 
-    const db = getDb();
+    const countRow = await queryOne('SELECT COUNT(*) as total FROM flash_news');
+    const total = countRow?.total ?? 0;
 
-    const { total } = db.prepare('SELECT COUNT(*) as total FROM flash_news').get() as { total: number };
     const offset = (page - 1) * pageSize;
-
-    const flashes = db.prepare(
-      'SELECT * FROM flash_news ORDER BY published_at DESC LIMIT ? OFFSET ?'
-    ).all(pageSize, offset);
+    const flashes = await query(
+      'SELECT * FROM flash_news ORDER BY published_at DESC LIMIT ? OFFSET ?',
+      [pageSize, offset]
+    );
 
     return NextResponse.json({
       success: true,
