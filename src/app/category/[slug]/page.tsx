@@ -53,8 +53,8 @@ export default async function CategoryPage({ params }: { params: { slug: string 
         <div className="site-container py-6">
           <h1 className="text-2xl font-bold mb-6" style={{ color: 'var(--c-text)' }}>{name || '24小时快讯'}</h1>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
-            <div className="lg:col-span-3">
+          <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 lg:gap-8">
+            <div className="lg:col-span-6">
               {isFlash ? (
                 flashes.length > 0 ? (
                   <div className="space-y-2">
@@ -76,26 +76,31 @@ export default async function CategoryPage({ params }: { params: { slug: string 
               )}
             </div>
 
-            <aside className="lg:col-span-1 space-y-5">
+            <aside className="lg:col-span-3 space-y-5">
               {!isFlash && flashes.length > 0 && (
                 <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--c-surface)' }}>
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: 'var(--c-accent)' }} />
+                      <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" style={{ color: 'var(--c-accent)' }}>
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" opacity="0.25" />
+                        <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" opacity="0.75" />
+                      </svg>
                       <h3 className="text-sm font-bold" style={{ color: 'var(--c-text)' }}>24小时快讯</h3>
                     </div>
                     <Link href="/category/24h-news" className="text-xs hover:underline" style={{ color: 'var(--c-text-3)' }}>全部</Link>
                   </div>
-                  {flashes.slice(0, 10).map((f: any) => {
-                    const ft = f.date_label || (f.published_at ? new Date(f.published_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '');
-                    return (
-                      <Link key={f.id} href={`/flash/${f.id}`} className="flex items-start gap-2 py-1.5 border-b last:border-0 hover:opacity-70 text-xs"
-                        style={{ borderColor: 'var(--c-border)' }}>
-                        <span className="flex-1 line-clamp-2 leading-relaxed" style={{ color: 'var(--c-text-2)' }}>{f.title}</span>
-                        {ft && <span className="flex-shrink-0 pt-0.5" style={{ color: 'var(--c-text-3)' }}>{ft}</span>}
-                      </Link>
-                    );
-                  })}
+                  <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                    {flashes.slice(0, 10).map((f: any) => {
+                      const ft = f.date_label || (f.published_at ? new Date(f.published_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '');
+                      return (
+                        <Link key={f.id} href={`/flash/${f.id}`} className="block py-1.5 border-b last:border-0 hover:opacity-70"
+                          style={{ borderColor: 'var(--c-border)' }}>
+                          <p className="text-xs leading-relaxed line-clamp-2" style={{ color: 'var(--c-text-2)' }}>{f.title}</p>
+                          {ft && <p className="text-xs mt-1" style={{ color: 'var(--c-text-3)' }}>{ft}</p>}
+                        </Link>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
