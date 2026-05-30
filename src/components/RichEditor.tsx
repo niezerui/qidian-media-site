@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 
 interface RichEditorProps {
   value: string;
@@ -29,9 +29,16 @@ export default function RichEditor({ value, onChange, placeholder = '在此输�
 
   // Set initial content
   const setInnerHTML = useCallback((node: HTMLDivElement | null) => {
-    if (node && node.innerHTML !== value) {
+    if (node) {
       node.innerHTML = value;
       editorRef.current = node;
+    }
+  }, [value]);
+
+  // Sync value on prop change (e.g., when editing an article)
+  useEffect(() => {
+    if (editorRef.current && editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value;
     }
   }, [value]);
 

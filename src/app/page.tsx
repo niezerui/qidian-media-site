@@ -7,8 +7,6 @@ import { siteConfig } from '@/lib/site.config';
 import { query } from '@/lib/db';
 import { cleanContent, extractFirstImage } from '@/lib/security';
 
-const NAV_CATS = siteConfig.categories;
-
 function parseArticle(a: any) {
   return { ...a, content: cleanContent(a.content || ''), cover_image: a.cover_image || extractFirstImage(a.content), tags: JSON.parse(a.tags || '[]'), is_featured: !!a.is_featured, is_exclusive: !!a.is_exclusive };
 }
@@ -37,19 +35,6 @@ export default async function HomePage({ searchParams }: { searchParams: { searc
       <Header />
       <main className="flex-1">
         {/* Category Nav */}
-        <div className="border-b" style={{ borderColor: 'var(--c-border)' }}>
-          <div className="site-container py-2.5">
-            <div className="flex items-center gap-5 overflow-x-auto scrollbar-hide text-sm">
-              <Link href="/" className="font-bold whitespace-nowrap border-b-2 pb-1.5"
-                style={{ color: 'var(--c-text)', borderColor: 'var(--c-accent)' }}>推荐</Link>
-              {NAV_CATS.map(cat => (
-                <Link key={cat.slug} href={`/category/${cat.slug}`} className="whitespace-nowrap pb-1.5 border-b-2 border-transparent hover:border-current transition-colors"
-                  style={{ color: 'var(--c-text-2)' }}>{cat.name}</Link>
-              ))}
-            </div>
-          </div>
-        </div>
-
         <div className="site-container py-6">
           {sq && <div className="mb-6 p-3 rounded-lg text-sm" style={{ backgroundColor: 'var(--c-surface)', color: 'var(--c-text-2)' }}>
             搜索 &ldquo;<b>{sq}</b>&rdquo; 的结果
