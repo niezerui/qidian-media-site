@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 interface BannerItem {
   id: number; title: string; slug: string; cover_image: string | null;
-  category_name?: string;
+  category_name?: string; tags?: string[];
 }
 
 export default function BannerCarousel({ items }: { items: BannerItem[] }) {
@@ -40,6 +40,9 @@ export default function BannerCarousel({ items }: { items: BannerItem[] }) {
               </div>
               <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/70 to-transparent">
                 {b.category_name && <span className="text-xs px-2 py-0.5 rounded-full mb-2 inline-block" style={{ backgroundColor: 'rgba(255,255,255,0.2)', color: '#fff' }}>{b.category_name}</span>}
+                {b.tags && b.tags.length > 0 && b.tags.slice(0, 3).map((t: string) => (
+                  <span key={t} className="text-xs px-2 py-0.5 rounded-full mb-2 ml-1 inline-block" style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#ddd' }}>{t}</span>
+                ))}
                 <h2 className="text-xl sm:text-2xl font-bold leading-snug text-white">{b.title}</h2>
               </div>
             </>

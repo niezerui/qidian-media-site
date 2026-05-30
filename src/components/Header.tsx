@@ -35,8 +35,11 @@ export default function Header() {
             <span className="text-base sm:text-lg font-bold tracking-tight" style={{ color: 'var(--c-text)' }}>{siteConfig.name}</span>
           </Link>
 
-          {/* Desktop categories — in logo row */}
+          {/* Desktop categories */}
           <nav className="hidden md:flex items-center gap-1 overflow-x-auto scrollbar-hide">
+            <Link href="/"
+              className="whitespace-nowrap px-2.5 py-1.5 rounded-md text-sm font-bold transition-colors"
+              style={{ color: 'var(--c-text)', backgroundColor: 'var(--c-surface)' }}>推荐</Link>
             {NAV.map(cat => (
               <Link key={cat.slug} href={`/category/${cat.slug}`}
                 className="whitespace-nowrap px-2.5 py-1.5 rounded-md text-sm transition-colors hover:bg-gray-50"
@@ -70,6 +73,8 @@ export default function Header() {
       {/* Mobile dropdown nav */}
       {menuOpen && (
         <div className="md:hidden border-t px-4 py-3 space-y-1" style={{ backgroundColor: 'var(--c-bg)', borderColor: 'var(--c-border)' }}>
+          <Link href="/" onClick={() => setMenuOpen(false)}
+            className="block py-2.5 text-sm border-b font-bold" style={{ borderColor: 'var(--c-border)', color: 'var(--c-text)' }}>推荐</Link>
           {NAV.map(cat => (
             <Link key={cat.slug} href={`/category/${cat.slug}`} onClick={() => setMenuOpen(false)}
               className="block py-2.5 text-sm border-b last:border-0 font-medium" style={{ borderColor: 'var(--c-border)', color: 'var(--c-text)' }}>{cat.name}</Link>

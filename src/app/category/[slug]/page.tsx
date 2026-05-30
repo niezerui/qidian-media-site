@@ -9,7 +9,6 @@ import { cleanContent, extractFirstImage } from '@/lib/security';
 
 const NAME_MAP: Record<string, string> = {};
 siteConfig.categories.forEach(c => NAME_MAP[c.slug] = c.name);
-const NAV_CATS = siteConfig.categories;
 
 function parseArticle(a: any) {
   return { ...a, content: cleanContent(a.content || ''), cover_image: a.cover_image || extractFirstImage(a.content), tags: JSON.parse(a.tags || '[]') };
@@ -32,7 +31,7 @@ async function getCatData(slug: string) {
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: { slug: string } }) {
-  const name = NAME_MAP[params.slug] || '分类';
+  const name = NAME_MAP[params.slug] || (params.slug === '24h-news' ? '24小时快讯' : '分类');
   return { title: `${name} | ${siteConfig.name}` };
 }
 
@@ -50,26 +49,8 @@ export default async function CategoryPage({ params }: { params: { slug: string 
     <>
       <Header />
       <main className="flex-1">
-        {/* Category Nav */}
-        <div className="border-b" style={{ borderColor: 'var(--c-border)' }}>
-          <div className="site-container py-2.5">
-            <div className="flex items-center gap-5 overflow-x-auto scrollbar-hide text-sm">
-              <Link href="/" className="whitespace-nowrap pb-1.5 border-b-2 border-transparent hover:border-current transition-colors" style={{ color: 'var(--c-text-2)' }}>推荐</Link>
-              {NAV_CATS.map(cat => (
-                <Link key={cat.slug} href={`/category/${cat.slug}`}
-                  className={`whitespace-nowrap pb-1.5 border-b-2 transition-colors ${params.slug === cat.slug ? 'font-bold' : 'border-transparent hover:border-current'}`}
-                  style={{ color: params.slug === cat.slug ? 'var(--c-text)' : 'var(--c-text-2)', borderColor: params.slug === cat.slug ? 'var(--c-accent)' : 'transparent' }}>
-                  {cat.name}
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-
         <div className="site-container py-6">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold" style={{ color: 'var(--c-text)' }}>{name || '24小时快讯'}</h1>
-          </div>
+          <h1 className="text-2xl font-bold mb-6" style={{ color: 'var(--c-text)' }}>{name || '24小时快讯'}</h1>
 
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
             <div className="lg:col-span-3">
@@ -77,8 +58,7 @@ export default async function CategoryPage({ params }: { params: { slug: string 
                 flashes.length > 0 ? (
                   <div className="space-y-2">
                     {flashes.map((f: any) => (
-                      <Link key={f.id} href={`/flash/${f.id}`}
-                        className="block py-3 border-b hover:opacity-70 transition-opacity"
+                      <Link key={f.id} href={`/flash/${f.id}`} className="block py-3 border-b hover:opacity-70 transition-opacity"
                         style={{ borderColor: 'var(--c-border)', color: 'var(--c-text)' }}>
                         <p className="text-sm">{f.title}</p>
                         <span className="text-xs" style={{ color: 'var(--c-text-3)' }}>{f.date_label || new Date(f.published_at).toLocaleDateString('zh-CN')}</span>
@@ -87,8 +67,8 @@ export default async function CategoryPage({ params }: { params: { slug: string 
                   </div>
                 ) : <div className="text-center py-20" style={{ color: 'var(--c-text-3)' }}>暂无快讯</div>
               ) : articles.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  {articles.map((a: any) => <ArticleCard key={a.id} article={a} />)}
+                <div className="border-t" style={{ borderColor: 'var(--c-border)' }}>
+                  {articles.map((a: any) => <ArticleCard key={a.id} article={a} variant="list" />)}
                 </div>
               ) : (
                 <div className="text-center py-20" style={{ color: 'var(--c-text-3)' }}>该分类暂无内容</div>
@@ -105,7 +85,7 @@ export default async function CategoryPage({ params }: { params: { slug: string 
                     </div>
                     <Link href="/category/24h-news" className="text-xs hover:underline" style={{ color: 'var(--c-text-3)' }}>全部</Link>
                   </div>
-                  {flashes.slice(0, 6).map((f: any) => (
+                  {flashes.slice(0, 10).map((f: any) => (
                     <Link key={f.id} href={`/flash/${f.id}`} className="block py-1.5 border-b last:border-0 hover:opacity-70 text-xs"
                       style={{ borderColor: 'var(--c-border)', color: 'var(--c-text-2)' }}>
                       <span className="line-clamp-2">{f.title}</span>
@@ -113,6 +93,13 @@ export default async function CategoryPage({ params }: { params: { slug: string 
                   ))}
                 </div>
               )}
+
+              <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--c-surface)' }}>
+                <h3 className="text-sm font-bold mb-2 pb-2" style={{ color: 'var(--c-text)', borderBottom: '2px solid var(--c-primary)' }}>联系{siteConfig.name}</h3>
+                <p className="text-xs leading-relaxed mb-2" style={{ color: 'var(--c-text-2)' }}>{siteConfig.slogan}</p>
+                <p className="text-xs" style={{ color: 'var(--c-text-3)' }}>{siteConfig.contact.editorEmail}</p>
+                <p className="text-xs" style={{ color: 'var(--c-text-3)' }}>{siteConfig.contact.bizEmail}</p>
+              </div>
             </aside>
           </div>
         </div>
