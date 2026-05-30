@@ -36,7 +36,8 @@ export default function BannerCarousel({ items }: { items: BannerItem[] }) {
           {b.cover_image ? (
             <>
               <div className="aspect-[21/9] overflow-hidden">
-                <img src={b.cover_image} alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <img src={b.cover_image} alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               </div>
               <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/70 to-transparent">
                 {b.category_name && <span className="text-xs px-2 py-0.5 rounded-full mb-2 inline-block" style={{ backgroundColor: 'rgba(255,255,255,0.2)', color: '#fff' }}>{b.category_name}</span>}
