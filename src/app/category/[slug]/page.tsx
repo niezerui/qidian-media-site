@@ -53,8 +53,8 @@ export default async function CategoryPage({ params }: { params: { slug: string 
         <div className="site-container py-6">
           <h1 className="text-2xl font-bold mb-6" style={{ color: 'var(--c-text)' }}>{name || '24小时快讯'}</h1>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
-            <div className="lg:col-span-3">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+            <div className="lg:col-span-2">
               {isFlash ? (
                 flashes.length > 0 ? (
                   <div className="space-y-2">
@@ -82,7 +82,7 @@ export default async function CategoryPage({ params }: { params: { slug: string 
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: 'var(--c-accent)' }} />
-                      <h3 className="text-sm font-bold" style={{ color: 'var(--c-text)' }}>24小时快讯</h3>
+                      <h3 className="text-base font-bold" style={{ color: 'var(--c-text)' }}>24小时快讯</h3>
                     </div>
                     <Link href="/category/24h-news" className="text-xs hover:underline" style={{ color: 'var(--c-text-3)' }}>全部</Link>
                   </div>
@@ -92,7 +92,7 @@ export default async function CategoryPage({ params }: { params: { slug: string 
                       return (
                         <Link key={f.id} href={`/flash/${f.id}`} className="block py-1.5 border-b last:border-0 hover:opacity-70"
                           style={{ borderColor: 'var(--c-border)' }}>
-                          <p className="text-xs leading-relaxed line-clamp-2" style={{ color: 'var(--c-text-2)' }}>{f.title}</p>
+                          <p className="text-sm leading-relaxed line-clamp-2" style={{ color: 'var(--c-text-2)' }}>{f.title}</p>
                           {ft && <p className="text-xs mt-1" style={{ color: 'var(--c-text-3)' }}>{ft}</p>}
                         </Link>
                       );
