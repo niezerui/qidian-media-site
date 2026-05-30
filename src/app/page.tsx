@@ -13,25 +13,24 @@ function parseArticle(a: any) {
   return { ...a, content: cleanContent(a.content || ''), cover_image: a.cover_image || extractFirstImage(a.content), tags: JSON.parse(a.tags || '[]'), is_featured: !!a.is_featured, is_exclusive: !!a.is_exclusive };
 }
 
+function fmtTags(tags: string[]) { return tags.filter(t => t && t.trim()).slice(0, 5).map(t => t.length > 8 ? t.slice(0, 8) : t); }
+
 async function getHomeData(search?: string) {
   try {
-    const [banners, featured, articles, flashes] = await Promise.all([
+    const [banners, articles, flashes] = await Promise.all([
       query(`SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE a.is_banner = 1 ORDER BY a.published_at DESC LIMIT 5`),
-      query(`SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE a.is_featured = 1 ORDER BY a.published_at DESC LIMIT 5`),
       query(`SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id ${search ? "WHERE a.title LIKE ? OR a.summary LIKE ?" : ""} ORDER BY a.is_featured DESC, a.published_at DESC LIMIT 12`, search ? [`%${search}%`, `%${search}%`] : []),
       query('SELECT * FROM flash_news ORDER BY published_at DESC LIMIT 10'),
     ]);
-    return { banners: banners.map(parseArticle).slice(0, 3), featured: featured.map(parseArticle), articles: articles.map(parseArticle), flashes, search };
-  } catch { return { banners: [], featured: [], articles: [], flashes: [], search }; }
+    return { banners: banners.map(parseArticle).slice(0, 3), articles: articles.map(parseArticle), flashes, search };
+  } catch { return { banners: [], articles: [], flashes: [], search }; }
 }
 
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage({ searchParams }: { searchParams: { search?: string } }) {
   const sq = searchParams.search;
-  const { banners, featured, articles, flashes } = await getHomeData(sq);
-  const mainFeatured = featured[0];
-  const subFeatured = featured.slice(1, 4);
+  const { banners, articles, flashes } = await getHomeData(sq);
 
   return (
     <>
@@ -41,11 +40,10 @@ export default async function HomePage({ searchParams }: { searchParams: { searc
         <div className="border-b" style={{ borderColor: 'var(--c-border)' }}>
           <div className="site-container py-2.5">
             <div className="flex items-center gap-5 overflow-x-auto scrollbar-hide text-sm">
-              <Link href="/" className="font-bold whitespace-nowrap border-b-2 pb-1.5 transition-colors"
+              <Link href="/" className="font-bold whitespace-nowrap border-b-2 pb-1.5"
                 style={{ color: 'var(--c-text)', borderColor: 'var(--c-accent)' }}>推荐</Link>
               {NAV_CATS.map(cat => (
-                <Link key={cat.slug} href={`/category/${cat.slug}`}
-                  className="whitespace-nowrap pb-1.5 border-b-2 border-transparent hover:border-current transition-colors"
+                <Link key={cat.slug} href={`/category/${cat.slug}`} className="whitespace-nowrap pb-1.5 border-b-2 border-transparent hover:border-current transition-colors"
                   style={{ color: 'var(--c-text-2)' }}>{cat.name}</Link>
               ))}
             </div>
@@ -61,19 +59,9 @@ export default async function HomePage({ searchParams }: { searchParams: { searc
           {!sq && banners.length > 0 && <BannerCarousel items={banners} />}
 
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
-            {/* LEFT: Articles (75%) */}
+            {/* LEFT: Latest articles */}
             <div className="lg:col-span-3">
-              {!sq && mainFeatured && <div className="mb-6"><ArticleCard article={mainFeatured} variant="featured" /></div>}
-              {!sq && subFeatured.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-                  {subFeatured.map((a: any) => <ArticleCard key={a.id} article={a} variant="compact" />)}
-                </div>
-              )}
-
-              <div className="flex items-center justify-between mb-4 pt-2 border-t" style={{ borderColor: 'var(--c-border)' }}>
-                <h2 className="text-lg font-bold" style={{ color: 'var(--c-text)' }}>{sq ? '搜索结果' : '最新报道'}</h2>
-              </div>
-
+              <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--c-text)' }}>{sq ? '搜索结果' : '最新报道'}</h2>
               {articles.length > 0 ? (
                 <div className="border-t" style={{ borderColor: 'var(--c-border)' }}>
                   {articles.map((a: any) => <ArticleCard key={a.id} article={a} variant="list" />)}
@@ -95,8 +83,8 @@ export default async function HomePage({ searchParams }: { searchParams: { searc
                     <Link href="/category/24h-news" className="text-xs hover:underline" style={{ color: 'var(--c-text-3)' }}>全部</Link>
                   </div>
                   <div className="space-y-0.5 max-h-[500px] overflow-y-auto">
-                    {flashes.slice(0, 10).map((f: any) => (
-                      <Link key={f.id} href={`/flash/${f.id}`} className="block py-1.5 border-b last:border-0 hover:opacity-70 transition-opacity text-xs leading-relaxed"
+                    {flashes.map((f: any) => (
+                      <Link key={f.id} href={`/flash/${f.id}`} className="block py-1.5 border-b last:border-0 hover:opacity-70 text-xs leading-relaxed"
                         style={{ borderColor: 'var(--c-border)', color: 'var(--c-text-2)' }}>
                         <span className="line-clamp-2">{f.title}</span>
                       </Link>

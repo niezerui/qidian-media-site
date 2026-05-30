@@ -76,8 +76,11 @@ export default function AdminDashboardPage() {
   // Article submit
   const handleArticleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!articleForm.content || articleForm.content.replace(/<[^>]*>/g, '').trim().length < 10) {
+      setError('正文内容太短，请至少输入10个有效字符'); return;
+    }
     try {
-      const tags = articleForm.tags.split(',').map(t => t.trim()).filter(Boolean);
+      const tags = articleForm.tags.split(',').map(t => t.trim()).filter(Boolean).slice(0, 5).map(t => t.length > 8 ? t.slice(0, 8) : t);
       const method = editingArticle ? 'PUT' : 'POST';
       const body: any = {
         ...articleForm, tags,
