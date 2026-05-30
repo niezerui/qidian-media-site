@@ -28,6 +28,7 @@ async function getArticle(slug: string) {
 }
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function generateMetadata({ params }: { params: { id: string } }) {
   const data = await getArticle(params.id);
