@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 }
 
 export default async function CategoryPage({ params }: { params: { slug: string } }) {
-  const name = NAME_MAP[params.slug] || params.slug === '24h-news' ? '24小时快讯' : '';
+  const name = NAME_MAP[params.slug] || (params.slug === '24h-news' ? '24小时快讯' : '');
   const slugIsFlash = params.slug === '24h-news';
   if (!slugIsFlash && !name) notFound();
 
