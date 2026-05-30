@@ -15,7 +15,7 @@ export const siteConfig = {
   logo: {
     type: 'image' as 'text' | 'image',
     text: '奇',
-    imageUrl: '/logo.png',           // ← 图片已放到 public/logo.png
+    imageUrl: '/logo.png',
   },
 
   // ---- 配色（改hex值立即生效） ----
