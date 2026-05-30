@@ -53,8 +53,8 @@ export default async function CategoryPage({ params }: { params: { slug: string 
         <div className="site-container py-6">
           <h1 className="text-2xl font-bold mb-6" style={{ color: 'var(--c-text)' }}>{name || '24小时快讯'}</h1>
 
-          <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 lg:gap-8">
-            <div className="lg:col-span-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
+            <div className="lg:col-span-3">
               {isFlash ? (
                 flashes.length > 0 ? (
                   <div className="space-y-2">
@@ -76,15 +76,12 @@ export default async function CategoryPage({ params }: { params: { slug: string 
               )}
             </div>
 
-            <aside className="lg:col-span-3 space-y-5">
+            <aside className="lg:col-span-1 space-y-5">
               {!isFlash && flashes.length > 0 && (
                 <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--c-surface)' }}>
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-1.5">
-                      <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" style={{ color: 'var(--c-accent)' }}>
-                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" opacity="0.25" />
-                        <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" opacity="0.75" />
-                      </svg>
+                      <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: 'var(--c-accent)' }} />
                       <h3 className="text-sm font-bold" style={{ color: 'var(--c-text)' }}>24小时快讯</h3>
                     </div>
                     <Link href="/category/24h-news" className="text-xs hover:underline" style={{ color: 'var(--c-text-3)' }}>全部</Link>
