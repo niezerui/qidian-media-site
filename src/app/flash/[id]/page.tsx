@@ -10,6 +10,7 @@ async function getFlashNews(id: string) {
 }
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function generateMetadata({ params }: { params: { id: string } }) {
   const flash = await getFlashNews(params.id);

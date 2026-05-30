@@ -27,6 +27,7 @@ async function getHomeData(search?: string) {
 }
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function HomePage({ searchParams }: { searchParams: { search?: string } }) {
   const sq = searchParams.search;

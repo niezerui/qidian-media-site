@@ -19,6 +19,7 @@ const nextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
           { key: 'Content-Security-Policy', value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src * data:; media-src *; frame-src www.youtube.com player.bilibili.com;" },
+          { key: 'Cache-Control', value: 'no-store, max-age=0, must-revalidate' },
         ],
       },
       {

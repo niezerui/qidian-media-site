@@ -29,6 +29,7 @@ async function getCatData(slug: string) {
 }
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function generateMetadata({ params }: { params: { slug: string } }) {
   const name = NAME_MAP[params.slug] || (params.slug === '24h-news' ? '24小时快讯' : '分类');
