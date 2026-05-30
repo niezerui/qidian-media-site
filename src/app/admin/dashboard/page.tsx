@@ -23,6 +23,7 @@ export default function AdminDashboardPage() {
     title: '', summary: '', content: '', category_id: '',
     author: '奇点编辑部', tags: '', cover_image: '',
     is_featured: false, is_exclusive: false, is_pinned: false, is_banner: false,
+    published_at: '',
   });
 
   // Flash form
@@ -108,13 +109,14 @@ export default function AdminDashboardPage() {
       tags: (article.tags || []).join(', '), cover_image: article.cover_image || '',
       is_featured: article.is_featured || false, is_exclusive: article.is_exclusive || false,
       is_pinned: article.is_featured || false, is_banner: article.is_banner || false,
+      published_at: article.published_at || '',
     });
     setShowArticleForm(true);
   };
 
   const resetArticleForm = () => {
     setEditingArticle(null);
-    setArticleForm({ title: '', summary: '', content: '', category_id: '', author: '奇点编辑部', tags: '', cover_image: '', is_featured: false, is_exclusive: false, is_pinned: false, is_banner: false });
+    setArticleForm({ title: '', summary: '', content: '', category_id: '', author: '奇点编辑部', tags: '', cover_image: '', is_featured: false, is_exclusive: false, is_pinned: false, is_banner: false, published_at: '' });
     setShowArticleForm(false);
   };
 
@@ -269,6 +271,16 @@ export default function AdminDashboardPage() {
                     </label>
                   </div>
 
+                  {/* 发布时间 */}
+                  <div>
+                    <label className="block text-sm font-medium text-brand-700 mb-1">发布时间</label>
+                    <input type="datetime-local"
+                      value={articleForm.published_at ? new Date(new Date(articleForm.published_at).getTime() - new Date(articleForm.published_at).getTimezoneOffset()*60000).toISOString().slice(0,16) : ''}
+                      onChange={e => setArticleForm({...articleForm, published_at: e.target.value ? new Date(e.target.value).toISOString() : ''})}
+                      className="w-60 px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-brand-900 text-sm" />
+                    <p className="text-xs text-brand-400 mt-1">留空则使用当前时间</p>
+                  </div>
+
                   {/* Rich Text Editor */}
                   <div>
                     <label className="block text-sm font-medium text-brand-700 mb-1">正文内容</label>
@@ -344,8 +356,12 @@ export default function AdminDashboardPage() {
                     <input type="text" value={flashForm.date_label} onChange={e => setFlashForm({...flashForm, date_label: e.target.value})} placeholder="如：5月29日" className="w-full px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-brand-900 text-sm" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-brand-700 mb-1">内容</label>
-                    <textarea value={flashForm.content} onChange={e => setFlashForm({...flashForm, content: e.target.value})} rows={4} className="w-full px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-brand-900 text-sm resize-none" />
+                    <label className="block text-sm font-medium text-brand-700 mb-1">内容（支持粘贴图文）</label>
+                    <RichEditor
+                      value={flashForm.content}
+                      onChange={(html) => setFlashForm({...flashForm, content: html})}
+                      placeholder="在此输入内容，支持粘贴带图片的文章..."
+                    />
                   </div>
                   <div className="flex items-center gap-3">
                     <button type="submit" className="px-5 py-2 bg-brand-900 text-white text-sm rounded-lg hover:bg-brand-800">发布快讯</button>
