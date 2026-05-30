@@ -71,12 +71,16 @@ export default async function HomePage({ searchParams }: { searchParams: { searc
                     <Link href="/category/24h-news" className="text-xs hover:underline" style={{ color: 'var(--c-text-3)' }}>全部</Link>
                   </div>
                   <div className="space-y-0.5 max-h-[500px] overflow-y-auto">
-                    {flashes.map((f: any) => (
-                      <Link key={f.id} href={`/flash/${f.id}`} className="block py-1.5 border-b last:border-0 hover:opacity-70 text-xs leading-relaxed"
-                        style={{ borderColor: 'var(--c-border)', color: 'var(--c-text-2)' }}>
-                        <span className="line-clamp-2">{f.title}</span>
-                      </Link>
-                    ))}
+                    {flashes.map((f: any) => {
+                      const ft = f.date_label || (f.published_at ? new Date(f.published_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '');
+                      return (
+                        <Link key={f.id} href={`/flash/${f.id}`} className="flex items-start gap-2 py-1.5 border-b last:border-0 hover:opacity-70 text-xs"
+                          style={{ borderColor: 'var(--c-border)' }}>
+                          <span className="flex-1 line-clamp-2 leading-relaxed" style={{ color: 'var(--c-text-2)' }}>{f.title}</span>
+                          {ft && <span className="flex-shrink-0 pt-0.5" style={{ color: 'var(--c-text-3)' }}>{ft}</span>}
+                        </Link>
+                      );
+                    })}
                   </div>
                 </div>
               )}

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { siteConfig } from '@/lib/site.config';
 
 const NAV = siteConfig.categories;
@@ -11,6 +11,7 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,13 +39,16 @@ export default function Header() {
           {/* Desktop categories */}
           <nav className="hidden md:flex items-center gap-1 overflow-x-auto scrollbar-hide">
             <Link href="/"
-              className="whitespace-nowrap px-2.5 py-1.5 rounded-md text-sm font-bold transition-colors"
-              style={{ color: 'var(--c-text)', backgroundColor: 'var(--c-surface)' }}>推荐</Link>
-            {NAV.map(cat => (
-              <Link key={cat.slug} href={`/category/${cat.slug}`}
-                className="whitespace-nowrap px-2.5 py-1.5 rounded-md text-sm transition-colors hover:bg-gray-50"
-                style={{ color: 'var(--c-text-2)' }}>{cat.name}</Link>
-            ))}
+              className={`whitespace-nowrap px-2.5 py-1.5 rounded-md text-sm font-bold transition-colors ${pathname === '/' ? '' : 'hover:bg-gray-50'}`}
+              style={{ color: pathname === '/' ? 'var(--c-text)' : 'var(--c-text-2)', backgroundColor: pathname === '/' ? 'var(--c-surface)' : 'transparent' }}>推荐</Link>
+            {NAV.map(cat => {
+              const active = pathname === `/category/${cat.slug}`;
+              return (
+                <Link key={cat.slug} href={`/category/${cat.slug}`}
+                  className={`whitespace-nowrap px-2.5 py-1.5 rounded-md text-sm transition-colors ${active ? 'font-bold' : 'hover:bg-gray-50'}`}
+                  style={{ color: active ? 'var(--c-text)' : 'var(--c-text-2)', backgroundColor: active ? 'var(--c-surface)' : 'transparent' }}>{cat.name}</Link>
+              );
+            })}
           </nav>
         </div>
 
@@ -74,11 +78,16 @@ export default function Header() {
       {menuOpen && (
         <div className="md:hidden border-t px-4 py-3 space-y-1" style={{ backgroundColor: 'var(--c-bg)', borderColor: 'var(--c-border)' }}>
           <Link href="/" onClick={() => setMenuOpen(false)}
-            className="block py-2.5 text-sm border-b font-bold" style={{ borderColor: 'var(--c-border)', color: 'var(--c-text)' }}>推荐</Link>
-          {NAV.map(cat => (
-            <Link key={cat.slug} href={`/category/${cat.slug}`} onClick={() => setMenuOpen(false)}
-              className="block py-2.5 text-sm border-b last:border-0 font-medium" style={{ borderColor: 'var(--c-border)', color: 'var(--c-text)' }}>{cat.name}</Link>
-          ))}
+            className={`block py-2.5 text-sm border-b font-bold ${pathname === '/' ? '' : ''}`}
+            style={{ borderColor: 'var(--c-border)', color: 'var(--c-text)' }}>推荐</Link>
+          {NAV.map(cat => {
+            const active = pathname === `/category/${cat.slug}`;
+            return (
+              <Link key={cat.slug} href={`/category/${cat.slug}`} onClick={() => setMenuOpen(false)}
+                className={`block py-2.5 text-sm border-b last:border-0 ${active ? 'font-bold' : ''}`}
+                style={{ borderColor: 'var(--c-border)', color: active ? 'var(--c-text)' : 'var(--c-text)' }}>{cat.name}</Link>
+            );
+          })}
         </div>
       )}
     </header>
