@@ -28,12 +28,11 @@ export default function Header() {
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2.5 flex-shrink-0 no-underline">
             {siteConfig.logo.type === 'image' ? (
-              <img src={siteConfig.logo.imageUrl} alt={siteConfig.name} className="h-7 sm:h-8 w-auto" />
+              <img src={siteConfig.logo.imageUrl} alt={siteConfig.name} className="h-9 sm:h-10 w-auto" />
             ) : (
               <span className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-white text-sm font-bold"
                 style={{ backgroundColor: 'var(--c-primary)' }}>{siteConfig.logo.text}</span>
             )}
-            <span className="text-base sm:text-lg font-bold tracking-tight" style={{ color: 'var(--c-text)' }}>{siteConfig.name}</span>
           </Link>
 
           {/* Desktop categories */}
