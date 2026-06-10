@@ -33,8 +33,7 @@ export const metadata: Metadata = {
     googleBot: { index: true, follow: true, 'max-video-preview': -1, 'max-image-preview': 'large', 'max-snippet': -1 },
   },
   verification: {
-    // 如有百度站长验证码，填在此处：
-    // other: { 'baidu-site-verification': ['your-code'] }
+    google: 'google513fd85c5bf9a326',
   },
   alternates: {
     canonical: SITE_URL,
