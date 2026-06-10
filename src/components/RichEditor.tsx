@@ -9,218 +9,249 @@ interface RichEditorProps {
 }
 
 export default function RichEditor({ value, onChange, placeholder = '在此输入内容，支持粘贴图文...' }: RichEditorProps) {
-  const editorRef = useRef<HTMLDivElement | null>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [hasContent, setHasContent] = useState(!!value);
+  const isInternalChange = useRef(false);
 
-  const syncContent = useCallback(() => {
-    if (editorRef.current) {
-      const html = editorRef.current.innerHTML;
-      setHasContent(!!editorRef.current.textContent?.trim());
-      onChange(html);
-    }
+  // 内容变更回调
+  const emitChange = useCallback(() => {
+    if (!editorRef.current) return;
+    isInternalChange.current = true;
+    onChange(editorRef.current.innerHTML);
   }, [onChange]);
 
-  const execCmd = (cmd: string, val?: string) => {
-    document.execCommand(cmd, false, val || undefined);
-    editorRef.current?.focus();
-    syncContent();
-  };
-
-  // Set initial content
-  const setInnerHTML = useCallback((node: HTMLDivElement | null) => {
-    if (node) {
-      node.innerHTML = value;
-      editorRef.current = node;
-    }
-  }, [value]);
-
-  // Sync value on prop change (e.g., when editing an article)
+  // 当外部 value 变化时同步到编辑器（如编辑已有文章）
   useEffect(() => {
-    if (editorRef.current && editorRef.current.innerHTML !== value) {
-      editorRef.current.innerHTML = value;
+    if (isInternalChange.current) { isInternalChange.current = false; return; }
+    const el = editorRef.current;
+    if (el && el.innerHTML !== value) {
+      el.innerHTML = value || '';
     }
   }, [value]);
 
-  const handlePaste = (e: React.ClipboardEvent) => {
-    e.preventDefault();
-    const clipboardData = e.clipboardData;
-    const html = clipboardData.getData('text/html');
-    const text = clipboardData.getData('text/plain');
-
-    if (html) {
-      document.execCommand('insertHTML', false, html);
-    } else if (text) {
-      document.execCommand('insertText', false, text);
-    }
-    syncContent();
+  // 执行编辑命令
+  const exec = (cmd: string, val?: string) => {
+    document.execCommand(cmd, false, val);
+    editorRef.current?.focus();
+    emitChange();
   };
 
+  // 插入链接
+  const insertLink = () => {
+    const sel = window.getSelection();
+    const hasSelection = sel && !sel.isCollapsed;
+    const selectedText = hasSelection ? sel!.toString() : '';
+    const url = prompt('链接地址:', 'https://');
+    if (!url) return;
+    if (selectedText) {
+      exec('createLink', url);
+    } else {
+      document.execCommand('insertHTML', false, `<a href="${url}" target="_blank" rel="noopener">${url}</a>`);
+      emitChange();
+    }
+  };
+
+  // 上传图片
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('type', 'image');
-      const res = await fetch('/api/admin/upload', { method: 'POST', body: formData });
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/admin/upload', { method: 'POST', body: fd });
       const data = await res.json();
-      if (data.success) {
-        document.execCommand('insertHTML', false, `<img src="${data.data.url}" alt="${file.name}" style="max-width:100%;height:auto;" />`);
-        syncContent();
+      if (!data.success) {
+        alert(data.error || '上传失败');
+        return;
       }
-    } catch (err) {
-      alert('图片上传失败');
+      // 插入图片（base64 data URI 或 URL）
+      const imgHtml = `<img src="${data.data.url}" alt="${file.name}" style="max-width:100%;height:auto;border-radius:8px;margin:12px 0;" />`;
+      document.execCommand('insertHTML', false, imgHtml);
+      emitChange();
+    } catch {
+      alert('图片上传失败，请检查网络');
     } finally {
       setUploading(false);
+      // 清空 input 以允许重复上传同一文件
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
+  // 插入视频（URL 方式）
   const insertVideo = () => {
-    const url = prompt('请输入视频URL（支持MP4、YouTube、B站等）:');
-    if (url) {
-      if (url.includes('youtube.com') || url.includes('youtu.be')) {
-        const vid = url.includes('watch?v=') ? url.split('v=')[1]?.split('&')[0] : url.split('/').pop();
-        document.execCommand('insertHTML', false, `<iframe src="https://www.youtube.com/embed/${vid}" width="100%" height="400" frameborder="0" allowfullscreen style="max-width:100%;"></iframe>`);
-      } else if (url.includes('bilibili.com')) {
-        const bvid = url.split('/video/')[1]?.split('?')[0];
-        if (bvid) {
-          document.execCommand('insertHTML', false, `<iframe src="https://player.bilibili.com/player.html?bvid=${bvid}" width="100%" height="400" frameborder="0" allowfullscreen style="max-width:100%;"></iframe>`);
-        }
-      } else if (url.match(/\.(mp4|webm|ogg)$/i)) {
-        document.execCommand('insertHTML', false, `<video src="${url}" controls style="max-width:100%;"></video>`);
-      } else {
-        document.execCommand('createLink', false, url);
-      }
+    const url = prompt('请输入视频URL（MP4 / YouTube / B站）:');
+    if (!url) return;
+    let html = '';
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      const vid = url.includes('watch?v=') ? url.split('v=')[1]?.split('&')[0] : url.split('/').pop();
+      html = `<iframe src="https://www.youtube.com/embed/${vid}" width="100%" height="400" frameborder="0" allowfullscreen style="max-width:100%;border-radius:8px;margin:12px 0;"></iframe>`;
+    } else if (url.includes('bilibili.com')) {
+      const bvid = url.split('/video/')[1]?.split('?')[0];
+      if (bvid) html = `<iframe src="https://player.bilibili.com/player.html?bvid=${bvid}" width="100%" height="400" frameborder="0" allowfullscreen style="max-width:100%;border-radius:8px;margin:12px 0;"></iframe>`;
+    } else if (url.match(/\.(mp4|webm|ogg)(\?.*)?$/i)) {
+      html = `<video src="${url}" controls style="max-width:100%;border-radius:8px;margin:12px 0;"></video>`;
+    } else {
+      exec('createLink', url);
+      return;
     }
-    syncContent();
+    document.execCommand('insertHTML', false, html);
+    emitChange();
+  };
+
+  // 粘贴处理（保留基本格式，清理脏 HTML）
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const html = e.clipboardData.getData('text/html');
+    const text = e.clipboardData.getData('text/plain');
+
+    if (html) {
+      // 清理常见脏标签
+      const cleaned = html
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+        .replace(/\s(on\w+)=/gi, ' data-removed=');
+      document.execCommand('insertHTML', false, cleaned);
+    } else if (text) {
+      document.execCommand('insertText', false, text);
+    }
+    emitChange();
   };
 
   return (
     <div className="border border-brand-200 rounded-lg overflow-hidden">
-      {/* Toolbar */}
-      <div className="flex items-center gap-0.5 p-2 bg-brand-50 border-b border-brand-100 flex-wrap">
-        <button
-          type="button" onClick={() => execCmd('bold')}
-          className="px-2.5 py-1.5 text-sm font-bold text-brand-600 hover:bg-white rounded transition-colors" title="加粗"
-        >B</button>
-        <button
-          type="button" onClick={() => execCmd('italic')}
-          className="px-2.5 py-1.5 text-sm italic text-brand-600 hover:bg-white rounded transition-colors" title="斜体"
-        >I</button>
-        <span className="w-px h-5 bg-brand-200 mx-1" />
-        <button
-          type="button" onClick={() => execCmd('formatBlock', 'h2')}
-          className="px-2.5 py-1.5 text-xs font-bold text-brand-600 hover:bg-white rounded transition-colors" title="标题"
-        >H2</button>
-        <button
-          type="button" onClick={() => execCmd('formatBlock', 'h3')}
-          className="px-2.5 py-1.5 text-xs font-bold text-brand-600 hover:bg-white rounded transition-colors" title="小标题"
-        >H3</button>
-        <button
-          type="button" onClick={() => execCmd('formatBlock', 'p')}
-          className="px-2.5 py-1.5 text-xs text-brand-600 hover:bg-white rounded transition-colors" title="正文"
-        >P</button>
-        <span className="w-px h-5 bg-brand-200 mx-1" />
-        <button
-          type="button" onClick={() => {
-            const url = prompt('链接地址:');
-            if (url) execCmd('createLink', url);
-          }}
-          className="px-2.5 py-1.5 text-xs text-brand-600 hover:bg-white rounded transition-colors" title="插入链接"
-        >🔗</button>
-        <button
-          type="button" onClick={() => execCmd('insertUnorderedList')}
-          className="px-2.5 py-1.5 text-xs text-brand-600 hover:bg-white rounded transition-colors" title="无序列表"
-        >•≡</button>
-        <button
-          type="button" onClick={() => execCmd('insertOrderedList')}
-          className="px-2.5 py-1.5 text-xs text-brand-600 hover:bg-white rounded transition-colors" title="有序列表"
-        >1≡</button>
-        <button
-          type="button" onClick={() => execCmd('formatBlock', 'blockquote')}
-          className="px-2.5 py-1.5 text-xs text-brand-600 hover:bg-white rounded transition-colors" title="引用"
-        >❝</button>
-        <span className="w-px h-5 bg-brand-200 mx-1" />
-        <label className="px-2.5 py-1.5 text-xs text-brand-600 hover:bg-white rounded transition-colors cursor-pointer" title="上传图片">
-          {uploading ? '⏳' : '🖼'}
-          <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploading} />
+      {/* ====== 工具栏 ====== */}
+      <div className="flex items-center gap-0.5 px-2 py-1.5 bg-brand-50 border-b border-brand-100 flex-wrap sticky top-0 z-10">
+        {/* 文本格式 */}
+        <Btn onClick={() => exec('bold')} title="加粗" active={false}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h5.5a3.5 3.5 0 010 7H7V5zm0 8h6a3.5 3.5 0 010 7H7v-7z"/></svg>
+        </Btn>
+        <Btn onClick={() => exec('italic')} title="斜体" active={false}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M10 5h6M14 5l-4 14m-2 0h6"/></svg>
+        </Btn>
+        <Btn onClick={() => exec('underline')} title="下划线" active={false}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3M4 21h16"/></svg>
+        </Btn>
+
+        <Divider />
+
+        {/* 标题 */}
+        <Btn onClick={() => exec('formatBlock', '<h2>')} title="大标题" active={false}>H2</Btn>
+        <Btn onClick={() => exec('formatBlock', '<h3>')} title="小标题" active={false}>H3</Btn>
+        <Btn onClick={() => exec('formatBlock', '<p>')} title="正文" active={false}>¶</Btn>
+
+        <Divider />
+
+        {/* 列表 & 引用 */}
+        <Btn onClick={() => exec('insertUnorderedList')} title="无序列表" active={false}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="5" r="2"/><circle cx="5" cy="12" r="2"/><circle cx="5" cy="19" r="2"/><path d="M10 5h10M10 12h10M10 19h10"/></svg>
+        </Btn>
+        <Btn onClick={() => exec('insertOrderedList')} title="有序列表" active={false}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><text x="3" y="8" fontSize="10">1.</text><text x="3" y="15" fontSize="10">2.</text><text x="3" y="22" fontSize="10">3.</text><path d="M11 6h10M11 13h10M11 20h10"/></svg>
+        </Btn>
+        <Btn onClick={() => exec('formatBlock', '<blockquote>')} title="引用" active={false}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M3 21c3 0 7-1 7-8V5H3v7h4c0 3-2 5-4 5v4zm8 0c3 0 7-1 7-8V5h-7v7h4c0 3-2 5-4 5v4z"/></svg>
+        </Btn>
+
+        <Divider />
+
+        {/* 链接 */}
+        <Btn onClick={insertLink} title="插入链接" active={false}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+        </Btn>
+
+        <Divider />
+
+        {/* 图片上传 */}
+        <label
+          className={`px-2 py-1 rounded text-xs font-medium transition-colors cursor-pointer select-none ${uploading ? 'text-brand-300' : 'text-brand-600 hover:bg-white hover:text-brand-900'}`}
+          title="上传图片"
+        >
+          {uploading ? (
+            <span className="inline-flex items-center gap-1">
+              <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeLinecap="round"/></svg>
+            </span>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+          )}
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploading} />
         </label>
-        <button
-          type="button" onClick={insertVideo}
-          className="px-2.5 py-1.5 text-xs text-brand-600 hover:bg-white rounded transition-colors" title="插入视频"
-        >🎬</button>
+
+        {/* 视频 */}
+        <Btn onClick={insertVideo} title="插入视频" active={false}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </Btn>
       </div>
 
-      {/* Editor */}
+      {/* ====== 编辑区域 ====== */}
       <div
-        ref={setInnerHTML}
+        ref={editorRef}
         contentEditable
         suppressContentEditableWarning
-        onInput={syncContent}
+        onInput={emitChange}
         onPaste={handlePaste}
-        onBlur={syncContent}
-        className="min-h-[300px] p-4 text-sm text-brand-800 focus:outline-none prose prose-sm max-w-none"
+        onBlur={emitChange}
+        className="editor-area min-h-[320px] p-4 text-sm text-brand-800 focus:outline-none"
         data-placeholder={placeholder}
-        style={{
-          lineHeight: 1.8,
-          wordBreak: 'break-word',
-        }}
+        dangerouslySetInnerHTML={{ __html: value }}
+        style={{ lineHeight: 1.85, wordBreak: 'break-word' }}
       />
 
-      {/* Empty placeholder */}
-      {!hasContent && (
-        <div className="absolute pointer-events-none text-brand-300 text-sm px-4" style={{ marginTop: '-292px' }}>
-          {placeholder}
-        </div>
-      )}
-
-      <style jsx>{`
-        [contenteditable]:empty:before {
+      {/* ====== 样式 ====== */}
+      <style jsx global>{`
+        .editor-area:empty:before {
           content: attr(data-placeholder);
-          color: #c4c4c4;
+          color: #b0b0b0;
+          pointer-events: none;
         }
-        [contenteditable] img {
-          max-width: 100%;
-          height: auto;
+        .editor-area img {
+          max-width: 100% !important;
+          height: auto !important;
           border-radius: 8px;
           margin: 12px 0;
+          display: block;
         }
-        [contenteditable] h2 {
-          font-size: 1.25rem;
-          font-weight: 700;
-          margin: 20px 0 10px;
+        .editor-area h2 { font-size: 1.3rem; font-weight: 700; margin: 24px 0 12px; color: #1a1a1a; }
+        .editor-area h3 { font-size: 1.1rem; font-weight: 600; margin: 20px 0 10px; color: #1a1a1a; }
+        .editor-area p { margin: 8px 0; }
+        .editor-area blockquote {
+          border-left: 3px solid #c41e3a;
+          padding: 8px 16px;
+          margin: 16px 0;
+          color: #555;
+          background: #fdf5f6;
+          border-radius: 0 6px 6px 0;
         }
-        [contenteditable] h3 {
-          font-size: 1.1rem;
-          font-weight: 600;
-          margin: 16px 0 8px;
-        }
-        [contenteditable] p {
-          margin: 8px 0;
-        }
-        [contenteditable] blockquote {
-          border-left: 3px solid #d1d1d1;
-          padding-left: 16px;
-          color: #6a6a6a;
-          margin: 12px 0;
-        }
-        [contenteditable] ul, [contenteditable] ol {
-          padding-left: 24px;
-          margin: 8px 0;
-        }
-        [contenteditable] a {
-          color: #c41e3a;
-          text-decoration: underline;
-        }
-        [contenteditable] video, [contenteditable] iframe {
-          max-width: 100%;
-          border-radius: 8px;
-          margin: 12px 0;
-        }
+        .editor-area ul, .editor-area ol { padding-left: 24px; margin: 8px 0; }
+        .editor-area li { margin: 4px 0; }
+        .editor-area a { color: #c41e3a; text-decoration: underline; }
+        .editor-area video, .editor-area iframe { max-width: 100%; border-radius: 8px; margin: 12px 0; }
+        .editor-area table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+        .editor-area td, .editor-area th { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+        .editor-area [style*="text-align:center"] { text-align: center; }
+        .editor-area [style*="text-align:right"] { text-align: right; }
       `}</style>
     </div>
   );
+}
+
+/** 工具栏小按钮 */
+function Btn({ children, onClick, title, active }: { children: React.ReactNode; onClick: () => void; title: string; active: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className={`px-2 py-1 rounded text-xs font-medium transition-colors select-none ${active ? 'bg-white text-brand-900 shadow-sm' : 'text-brand-600 hover:bg-white hover:text-brand-900'}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** 分隔线 */
+function Divider() {
+  return <span className="w-px h-5 bg-brand-200 mx-0.5" />;
 }

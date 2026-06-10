@@ -42,6 +42,8 @@ export async function ensureInit(): Promise<void> {
 
   // Migrate: add is_banner column if missing
   try { await db.execute(`ALTER TABLE articles ADD COLUMN is_banner INTEGER DEFAULT 0`); } catch {}
+  // Migrate: add status column (published/draft)
+  try { await db.execute(`ALTER TABLE articles ADD COLUMN status TEXT DEFAULT 'published'`); } catch {}
 
   // Indexes (may fail if already exist, safe to retry)
   const indexes = [

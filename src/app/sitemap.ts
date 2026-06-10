@@ -27,7 +27,7 @@ export default async function sitemap() {
   let articlePages: any[] = [];
   try {
     const articles = await query(
-      `SELECT slug, updated_at, published_at FROM articles ORDER BY published_at DESC LIMIT 1000`
+      `SELECT slug, updated_at, published_at FROM articles WHERE (status IS NULL OR status = 'published') ORDER BY published_at DESC LIMIT 1000`
     );
     articlePages = articles.map((a: any) => ({
       url: `${SITE_URL}/article/${a.slug}`,
