@@ -33,9 +33,9 @@ export const siteConfig = {
 
   // ---- 联系方式 ----
   contact: {
-    editorEmail: 'editor@qidian.news',
-    bizEmail: 'biz@qidian.news',
-    hrEmail: 'hr@qidian.news',
+    editorEmail: 'qiboshi2025@gmail.com',
+    bizEmail: 'qiboshi2025@gmail.com',
+    hrEmail: 'qiboshi2025@gmail.com',
   },
 
   // ---- 首页布局 ----

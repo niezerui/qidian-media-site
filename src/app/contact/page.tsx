@@ -1,5 +1,6 @@
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { siteConfig } from '@/lib/site.config';
 
 export const metadata = {
   title: '联系奇点',
@@ -27,7 +28,7 @@ export default function ContactPage() {
                   </svg>
                 </div>
                 <h3 className="font-bold text-brand-900 mb-2">投稿/爆料</h3>
-                <p className="text-sm text-brand-500">editor@qidian.news</p>
+                <p className="text-sm text-brand-500">{siteConfig.contact.editorEmail}</p>
               </div>
 
               <div className="p-6 bg-brand-50 rounded-xl">
@@ -37,7 +38,7 @@ export default function ContactPage() {
                   </svg>
                 </div>
                 <h3 className="font-bold text-brand-900 mb-2">商务合作</h3>
-                <p className="text-sm text-brand-500">biz@qidian.news</p>
+                <p className="text-sm text-brand-500">{siteConfig.contact.bizEmail}</p>
               </div>
 
               <div className="p-6 bg-brand-50 rounded-xl">
@@ -47,7 +48,7 @@ export default function ContactPage() {
                   </svg>
                 </div>
                 <h3 className="font-bold text-brand-900 mb-2">加入我们</h3>
-                <p className="text-sm text-brand-500">hr@qidian.news</p>
+                <p className="text-sm text-brand-500">{siteConfig.contact.hrEmail}</p>
               </div>
             </div>
 
