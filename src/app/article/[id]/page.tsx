@@ -16,6 +16,10 @@ async function getArticle(slug: string) {
     if (!article) return null;
     article.content = cleanContent(article.content || '');
     article.tags = JSON.parse(article.tags || '[]');
+    // SQLite 返回整数 0/1，转成布尔值，防止 JSX 中 {0 && <Comp>} 渲染出 "0"
+    article.is_exclusive = !!article.is_exclusive;
+    article.is_featured = !!article.is_featured;
+    article.is_banner = !!article.is_banner;
 
     const related = await query(
       `SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE a.category_id = ? AND a.id != ? ORDER BY a.published_at DESC LIMIT 3`,

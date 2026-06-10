@@ -27,7 +27,7 @@ export default function ArticleCard({ article, variant = 'default' }: { article:
         <div className={article.cover_image ? 'p-6' : 'p-8'}>
           <div className="flex items-center gap-2 mb-2">
             {article.category_name && <span className="text-xs px-2.5 py-0.5 rounded-full" style={{ backgroundColor: 'var(--c-border)', color: 'var(--c-text-2)' }}>{article.category_name}</span>}
-            {article.is_exclusive && <span className="text-xs px-2.5 py-0.5 rounded-full text-white" style={{ backgroundColor: 'var(--c-accent)' }}>独家</span>}
+            {!!article.is_exclusive && <span className="text-xs px-2.5 py-0.5 rounded-full text-white" style={{ backgroundColor: 'var(--c-accent)' }}>独家</span>}
           </div>
           <h2 className="text-2xl font-bold leading-snug mb-2 group-hover:opacity-70 transition-opacity" style={{ color: 'var(--c-text)' }}>{article.title}</h2>
           <p className="text-sm line-clamp-2 mb-3" style={{ color: 'var(--c-text-2)' }}>{article.summary}</p>
@@ -70,7 +70,7 @@ export default function ArticleCard({ article, variant = 'default' }: { article:
         <div className="flex-1 min-w-0 py-1">
           <div className="flex items-center gap-2 mb-1.5">
             {article.category_name && <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: 'var(--c-surface)', color: 'var(--c-text-2)' }}>{article.category_name}</span>}
-            {article.is_exclusive && <span className="text-xs px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: 'var(--c-accent)' }}>独家</span>}
+            {!!article.is_exclusive && <span className="text-xs px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: 'var(--c-accent)' }}>独家</span>}
           </div>
           <h3 className="text-base font-bold line-clamp-2 leading-snug" style={{ color: 'var(--c-text)' }}>{article.title}</h3>
           <div className="flex items-center gap-2 mt-1.5 text-xs" style={{ color: 'var(--c-text-3)' }}>
@@ -100,7 +100,7 @@ export default function ArticleCard({ article, variant = 'default' }: { article:
       <div className="p-4">
         <div className="flex items-center gap-2 mb-2">
           {article.category_name && <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: 'var(--c-surface)', color: 'var(--c-text-2)' }}>{article.category_name}</span>}
-          {article.is_exclusive && <span className="text-xs px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: 'var(--c-accent)' }}>独家</span>}
+          {!!article.is_exclusive && <span className="text-xs px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: 'var(--c-accent)' }}>独家</span>}
         </div>
         <h3 className="text-base font-bold line-clamp-2 leading-snug mb-1.5 group-hover:opacity-70 transition-opacity" style={{ color: 'var(--c-text)' }}>
           {article.title}
