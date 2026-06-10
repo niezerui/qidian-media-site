@@ -33,7 +33,11 @@ export const revalidate = 0;
 
 export async function generateMetadata({ params }: { params: { slug: string } }) {
   const name = NAME_MAP[params.slug] || (params.slug === '24h-news' ? '24小时快讯' : '分类');
-  return { title: `${name} | ${siteConfig.name}` };
+  return {
+    title: `${name} | ${siteConfig.name}`,
+    description: `${siteConfig.name}${name}频道，提供最新科技商业资讯`,
+    alternates: { canonical: `https://www.qidianyanjiushe.com/category/${params.slug}` },
+  };
 }
 
 export default async function CategoryPage({ params }: { params: { slug: string } }) {

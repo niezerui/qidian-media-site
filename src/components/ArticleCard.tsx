@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { getImageUrl } from '@/lib/image';
 
 interface Article {
   id: number; title: string; slug: string; summary: string;
@@ -20,7 +21,7 @@ export default function ArticleCard({ article, variant = 'default' }: { article:
       <Link href={`/article/${article.slug}`} className="group block rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--c-surface)' }}>
         {article.cover_image && (
           <div className="aspect-[21/9] overflow-hidden">
-            <img src={article.cover_image} alt={article.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+            <img src={getImageUrl(article.cover_image)} alt={article.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
           </div>
         )}
         <div className={article.cover_image ? 'p-6' : 'p-8'}>
@@ -50,7 +51,7 @@ export default function ArticleCard({ article, variant = 'default' }: { article:
         </div>
         {article.cover_image && (
           <div className="w-20 h-14 flex-shrink-0 rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--c-surface)' }}>
-            <img src={article.cover_image} alt="" className="w-full h-full object-cover" />
+            <img src={getImageUrl(article.cover_image)} alt="" className="w-full h-full object-cover" />
           </div>
         )}
       </Link>
@@ -63,7 +64,7 @@ export default function ArticleCard({ article, variant = 'default' }: { article:
       <Link href={`/article/${article.slug}`} className="group flex gap-4 py-4 border-b hover:opacity-70 transition-opacity" style={{ borderColor: 'var(--c-border)' }}>
         {article.cover_image && (
           <div className="w-40 h-24 flex-shrink-0 rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--c-surface)' }}>
-            <img src={article.cover_image} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+            <img src={getImageUrl(article.cover_image)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
           </div>
         )}
         <div className="flex-1 min-w-0 py-1">
@@ -92,7 +93,7 @@ export default function ArticleCard({ article, variant = 'default' }: { article:
       {/* 封面 */}
       {article.cover_image && (
         <div className="aspect-[16/9] overflow-hidden" style={{ backgroundColor: 'var(--c-surface)' }}>
-          <img src={article.cover_image} alt={article.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+          <img src={getImageUrl(article.cover_image)} alt={article.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
         </div>
       )}
       {/* 内容 */}
