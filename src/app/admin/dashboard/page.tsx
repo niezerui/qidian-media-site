@@ -304,22 +304,24 @@ export default function AdminDashboardPage() {
             <div className="bg-white border border-brand-100 rounded-xl overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-brand-50 text-brand-500">
-                    <tr>
-                      <th className="text-left px-4 py-3 font-medium">标题</th>
-                      <th className="text-left px-4 py-3 font-medium">分类</th>
-                      <th className="text-center px-4 py-3 font-medium w-16">精选</th>
-                      <th className="text-left px-4 py-3 font-medium">阅读</th>
-                      <th className="text-left px-4 py-3 font-medium">时间</th>
-                      <th className="text-right px-4 py-3 font-medium">操作</th>
-                    </tr>
-                  </thead>
+                    <thead className="bg-brand-50 text-brand-500">
+                      <tr>
+                        <th className="text-left px-4 py-3 font-medium">标题</th>
+                        <th className="text-left px-4 py-3 font-medium">分类</th>
+                        <th className="text-center px-4 py-3 font-medium w-16">精选</th>
+                        <th className="text-center px-4 py-3 font-medium w-16">Banner</th>
+                        <th className="text-left px-4 py-3 font-medium">阅读</th>
+                        <th className="text-left px-4 py-3 font-medium">时间</th>
+                        <th className="text-right px-4 py-3 font-medium">操作</th>
+                      </tr>
+                    </thead>
                   <tbody className="divide-y divide-brand-50">
                     {articles.map(a => (
                       <tr key={a.id} className="hover:bg-brand-50/50">
                         <td className="px-4 py-3 text-brand-900 font-medium max-w-[300px] truncate">{a.title}</td>
                         <td className="px-4 py-3 text-brand-500">{a.category_name}</td>
                         <td className="px-4 py-3 text-center">{a.is_featured ? <span className="text-xs px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full font-medium">精选</span> : <span className="text-brand-300">-</span>}</td>
+                        <td className="px-4 py-3 text-center">{a.is_banner ? <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full font-medium">🎬 Banner</span> : <span className="text-brand-300">-</span>}</td>
                         <td className="px-4 py-3 text-brand-500">{a.view_count}</td>
                         <td className="px-4 py-3 text-brand-400 whitespace-nowrap text-xs">{new Date(a.published_at).toLocaleDateString('zh-CN')}</td>
                         <td className="px-4 py-3 text-right">
@@ -328,7 +330,7 @@ export default function AdminDashboardPage() {
                         </td>
                       </tr>
                     ))}
-                    {articles.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-brand-400">暂无文章</td></tr>}
+                    {articles.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center text-brand-400">暂无文章</td></tr>}
                   </tbody>
                 </table>
               </div>
