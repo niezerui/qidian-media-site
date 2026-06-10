@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { query, queryOne } from '@/lib/db';
 import { cleanContent, extractFirstImage } from '@/lib/security';
 import { siteConfig } from '@/lib/site.config';
+import { getImageUrl } from '@/lib/image';
 
 async function getArticle(slug: string) {
   try {
@@ -33,7 +34,29 @@ export const revalidate = 0;
 export async function generateMetadata({ params }: { params: { id: string } }) {
   const data = await getArticle(params.id);
   if (!data) return { title: '404' };
-  return { title: `${data.article.title} | ${siteConfig.name}`, description: data.article.summary || '' };
+  const { article } = data;
+  const coverImg = article.cover_image || extractFirstImage(article.content);
+  return {
+    title: `${article.title} | ${siteConfig.name}`,
+    description: article.summary || article.title,
+    keywords: Array.isArray(article.tags) ? article.tags : [],
+    openGraph: {
+      type: 'article',
+      title: article.title,
+      description: article.summary || article.title,
+      locale: 'zh_CN',
+      siteName: siteConfig.name,
+      publishedTime: article.published_at,
+      authors: [article.author],
+      images: coverImg ? [{ url: coverImg, width: 1200, height: 630, alt: article.title }] : [],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: article.title,
+      description: article.summary || article.title,
+      images: coverImg ? [coverImg] : [],
+    },
+  };
 }
 
 export default async function ArticleDetailPage({ params }: { params: { id: string } }) {
@@ -43,9 +66,32 @@ export default async function ArticleDetailPage({ params }: { params: { id: stri
   const { article, related } = data;
   const date = new Date(article.published_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
   const coverImg = article.cover_image || extractFirstImage(article.content);
+  const SITE_URL = 'https://www.qidianyanjiushe.com';
+
+  // JSON-LD 文章结构化数据
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'NewsArticle',
+    headline: article.title,
+    description: article.summary || article.title,
+    datePublished: article.published_at,
+    dateModified: article.updated_at || article.published_at,
+    author: { '@type': 'Person', name: article.author },
+    publisher: {
+      '@type': 'NewsMediaOrganization',
+      name: siteConfig.name,
+      logo: { '@type': 'ImageObject', url: `${SITE_URL}/logo.png` },
+    },
+    mainEntityOfPage: { '@type': 'WebPage', '@id': `${SITE_URL}/article/${params.id}` },
+    image: coverImg ? [coverImg] : [],
+    keywords: Array.isArray(article.tags) ? article.tags.join(',') : '',
+    articleSection: article.category_name,
+    inLanguage: 'zh-CN',
+  };
 
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <Header />
       <main className="flex-1">
         <article className="site-container py-8">
@@ -76,7 +122,7 @@ export default async function ArticleDetailPage({ params }: { params: { id: stri
             {/* Cover */}
             {coverImg && (
               <div className="mb-8 rounded-xl overflow-hidden">
-                <img src={coverImg} alt={article.title} className="w-full object-cover" />
+                <img src={getImageUrl(coverImg)} alt={article.title} className="w-full object-cover" />
               </div>
             )}
 
@@ -100,7 +146,7 @@ export default async function ArticleDetailPage({ params }: { params: { id: stri
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {related.map((r: any) => (
                   <Link key={r.id} href={`/article/${r.slug}`} className="group block bg-white rounded-lg border p-3 hover:shadow-sm transition-shadow" style={{ borderColor: 'var(--c-border)' }}>
-                    {r.cover_image && <div className="aspect-[16/9] rounded-md overflow-hidden mb-2" style={{ backgroundColor: 'var(--c-surface)' }}><img src={r.cover_image} alt="" className="w-full h-full object-cover" /></div>}
+                    {r.cover_image && <div className="aspect-[16/9] rounded-md overflow-hidden mb-2" style={{ backgroundColor: 'var(--c-surface)' }}><img src={getImageUrl(r.cover_image)} alt="" className="w-full h-full object-cover" /></div>}
                     <h3 className="text-sm font-medium line-clamp-2" style={{ color: 'var(--c-text)' }}>{r.title}</h3>
                   </Link>
                 ))}

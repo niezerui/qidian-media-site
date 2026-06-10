@@ -17,8 +17,15 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
   if (!flash) return { title: '快讯未找到' };
 
   return {
-    title: flash.title,
+    title: `${flash.title} | 奇点快讯`,
     description: flash.title,
+    alternates: { canonical: `https://www.qidianyanjiushe.com/flash/${params.id}` },
+    openGraph: {
+      type: 'article',
+      title: flash.title,
+      description: flash.title,
+      publishedTime: flash.published_at,
+    },
   };
 }
 
