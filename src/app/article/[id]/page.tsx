@@ -6,6 +6,7 @@ import { query, queryOne } from '@/lib/db';
 import { cleanContent, extractFirstImage } from '@/lib/security';
 import { siteConfig } from '@/lib/site.config';
 import { getImageUrl } from '@/lib/image';
+import ViewTracker from '@/components/ViewTracker';
 
 async function getArticle(slug: string) {
   try {
@@ -155,6 +156,7 @@ export default async function ArticleDetailPage({ params }: { params: { id: stri
           </section>
         )}
       </main>
+      <ViewTracker articleId={article.id} />
       <Footer />
     </>
   );
