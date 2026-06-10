@@ -21,7 +21,7 @@ async function getCatData(slug: string) {
       return { isFlash: true, flashes, total: flashes.length };
     }
     const [articles, flashes] = await Promise.all([
-      query(`SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE c.slug = ? ORDER BY a.published_at DESC LIMIT 20`, [slug]),
+      query(`SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE c.slug = ? AND (a.status IS NULL OR a.status = 'published') ORDER BY a.published_at DESC LIMIT 20`, [slug]),
       query('SELECT * FROM flash_news ORDER BY published_at DESC LIMIT 10'),
     ]);
     return { articles: articles.map(parseArticle), flashes, total: articles.length };

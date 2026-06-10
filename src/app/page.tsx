@@ -16,9 +16,9 @@ function fmtTags(tags: string[]) { return tags.filter(t => t && t.trim()).slice(
 async function getHomeData(search?: string) {
   try {
     const [banners, featured, articles, flashes] = await Promise.all([
-      query(`SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE a.is_banner = 1 ORDER BY a.published_at DESC LIMIT 5`),
-      query(`SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE a.is_featured = 1 ORDER BY a.published_at DESC LIMIT 5`),
-      query(`SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id ${search ? "WHERE a.title LIKE ? OR a.summary LIKE ?" : ""} ORDER BY a.is_featured DESC, a.published_at DESC LIMIT 12`, search ? [`%${search}%`, `%${search}%`] : []),
+      query(`SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE a.is_banner = 1 AND (a.status IS NULL OR a.status = 'published') ORDER BY a.published_at DESC LIMIT 5`),
+      query(`SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE a.is_featured = 1 AND (a.status IS NULL OR a.status = 'published') ORDER BY a.published_at DESC LIMIT 5`),
+      query(`SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE (a.status IS NULL OR a.status = 'published') ${search ? "AND (a.title LIKE ? OR a.summary LIKE ?)" : ""} ORDER BY a.is_featured DESC, a.published_at DESC LIMIT 12`, search ? [`%${search}%`, `%${search}%`] : []),
       query('SELECT * FROM flash_news ORDER BY published_at DESC LIMIT 10'),
     ]);
     const finalBanners = (banners.length > 0 ? banners : featured.slice(0, 3)).map(parseArticle).slice(0, 3);

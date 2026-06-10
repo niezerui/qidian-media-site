@@ -73,12 +73,13 @@ export async function POST(request: NextRequest) {
     const isFeatured = body.is_featured ? 1 : 0;
     const isExclusive = body.is_exclusive ? 1 : 0;
     const isBanner = body.is_banner ? 1 : 0;
+    const status = body.status === 'draft' ? 'draft' : 'published';
     const publishedAt = body.published_at || new Date().toISOString();
 
     const result = await execute(
-      `INSERT INTO articles (title, slug, summary, content, cover_image, category_id, author, tags, is_featured, is_exclusive, is_banner, published_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [title, slug, summary, content, coverImage, categoryId, author, tags, isFeatured, isExclusive, isBanner, publishedAt]
+      `INSERT INTO articles (title, slug, summary, content, cover_image, category_id, author, tags, is_featured, is_exclusive, is_banner, status, published_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [title, slug, summary, content, coverImage, categoryId, author, tags, isFeatured, isExclusive, isBanner, status, publishedAt]
     );
 
     const article = await queryOne('SELECT * FROM articles WHERE id = ?', [result.lastInsertRowid]);
@@ -115,12 +116,13 @@ export async function PUT(request: NextRequest) {
     const isFeatured = body.is_featured ? 1 : 0;
     const isExclusive = body.is_exclusive ? 1 : 0;
     const isBanner = body.is_banner ? 1 : 0;
+    const status = body.status === 'draft' ? 'draft' : 'published';
 
     await execute(
       `UPDATE articles
-       SET title = ?, summary = ?, content = ?, cover_image = ?, category_id = ?, author = ?, tags = ?, is_featured = ?, is_exclusive = ?, is_banner = ?, updated_at = CURRENT_TIMESTAMP
+       SET title = ?, summary = ?, content = ?, cover_image = ?, category_id = ?, author = ?, tags = ?, is_featured = ?, is_exclusive = ?, is_banner = ?, status = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
-      [title, summary, content, coverImage, categoryId, author, tags, isFeatured, isExclusive, isBanner, body.id]
+      [title, summary, content, coverImage, categoryId, author, tags, isFeatured, isExclusive, isBanner, status, body.id]
     );
 
     const article = await queryOne('SELECT * FROM articles WHERE id = ?', [body.id]);

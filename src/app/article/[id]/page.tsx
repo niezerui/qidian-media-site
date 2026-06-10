@@ -22,7 +22,7 @@ async function getArticle(slug: string) {
     article.is_banner = !!article.is_banner;
 
     const related = await query(
-      `SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE a.category_id = ? AND a.id != ? ORDER BY a.published_at DESC LIMIT 3`,
+      `SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE a.category_id = ? AND a.id != ? AND (a.status IS NULL OR a.status = 'published') ORDER BY a.published_at DESC LIMIT 3`,
       [article.category_id, article.id]
     );
 

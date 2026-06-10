@@ -74,31 +74,34 @@ export default function AdminDashboardPage() {
     } catch { setError('网络错误'); }
   };
 
-  // Article submit
+  // Article submit / save draft
+  const saveArticle = async (status: 'draft' | 'published') => {
+    const tags = articleForm.tags.split(',').map(t => t.trim()).filter(Boolean).slice(0, 5).map(t => t.length > 8 ? t.slice(0, 8) : t);
+    const method = editingArticle ? 'PUT' : 'POST';
+    const body: any = {
+      ...articleForm, tags, status,
+      category_id: parseInt(articleForm.category_id),
+      is_featured: articleForm.is_featured || articleForm.is_pinned,
+      is_banner: articleForm.is_banner,
+    };
+    if (editingArticle) body.id = editingArticle.id;
+
+    const res = await fetch('/api/admin/articles', {
+      method, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (data.success) { resetArticleForm(); fetchData(); setSuccess(status === 'draft' ? '草稿已保存' : editingArticle ? '修改成功' : '发布成功'); setTimeout(() => setSuccess(''), 2000); }
+    else { setError(data.error || '操作失败'); }
+  };
+
   const handleArticleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!articleForm.content || articleForm.content.replace(/<[^>]*>/g, '').trim().length < 10) {
-      setError('正文内容太短，请至少输入10个有效字符'); return;
-    }
-    try {
-      const tags = articleForm.tags.split(',').map(t => t.trim()).filter(Boolean).slice(0, 5).map(t => t.length > 8 ? t.slice(0, 8) : t);
-      const method = editingArticle ? 'PUT' : 'POST';
-      const body: any = {
-        ...articleForm, tags,
-        category_id: parseInt(articleForm.category_id),
-        is_featured: articleForm.is_featured || articleForm.is_pinned,
-        is_banner: articleForm.is_banner,
-      };
-      if (editingArticle) body.id = editingArticle.id;
+    try { await saveArticle('published'); } catch { setError('网络错误'); }
+  };
 
-      const res = await fetch('/api/admin/articles', {
-        method, headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.success) { resetArticleForm(); fetchData(); setSuccess(editingArticle ? '修改成功' : '发布成功'); setTimeout(() => setSuccess(''), 2000); }
-      else { setError(data.error || '操作失败'); }
-    } catch { setError('网络错误'); }
+  const handleSaveDraft = async () => {
+    try { await saveArticle('draft'); } catch { setError('网络错误'); }
   };
 
   const handleEditArticle = (article: any) => {
@@ -226,13 +229,13 @@ export default function AdminDashboardPage() {
                       <label className="block text-sm font-medium text-brand-700 mb-1">封面图片</label>
                       <div className="flex gap-2">
                         <input type="text" value={articleForm.cover_image} onChange={e => setArticleForm({...articleForm, cover_image: e.target.value})} placeholder="粘贴URL或上传图片" className="flex-1 px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-brand-900 text-sm" />
-                        <label className="px-3 py-2.5 border border-brand-200 rounded-lg text-xs text-brand-500 hover:bg-brand-50 cursor-pointer whitespace-nowrap flex items-center gap-1">
-                          📷 本地上传
+                        <label className={`px-3 py-2.5 border border-brand-200 rounded-lg text-xs hover:bg-brand-50 cursor-pointer whitespace-nowrap flex items-center gap-1 transition-colors ${uploading ? 'text-brand-300 pointer-events-none' : 'text-brand-500'}`}>
+                          {uploading ? '⏳ 上传中...' : '📷 本地上传'}
                           <input type="file" accept="image/*" onChange={async (e) => {
                             const file = e.target.files?.[0]; if (!file) return;
                             setUploading(true);
                             try {
-                              const fd = new FormData(); fd.append('file', file); fd.append('type', 'image');
+                              const fd = new FormData(); fd.append('file', file);
                               const res = await fetch('/api/admin/upload', { method: 'POST', body: fd });
                               const data = await res.json();
                               if (data.success) setArticleForm(f => ({...f, cover_image: data.data.url}));
@@ -294,6 +297,7 @@ export default function AdminDashboardPage() {
 
                   <div className="flex items-center gap-3 pt-2">
                     <button type="submit" className="px-6 py-2.5 bg-brand-900 text-white text-sm font-medium rounded-lg hover:bg-brand-800">{editingArticle ? '保存修改' : '发布文章'}</button>
+                    <button type="button" onClick={handleSaveDraft} className="px-6 py-2.5 border-2 border-brand-200 text-brand-600 text-sm font-medium rounded-lg hover:border-brand-900 hover:text-brand-900 transition-colors">💾 保存草稿</button>
                     <button type="button" onClick={resetArticleForm} className="px-5 py-2.5 border border-brand-200 text-brand-600 text-sm rounded-lg hover:bg-brand-50">取消</button>
                   </div>
                 </form>
@@ -310,6 +314,7 @@ export default function AdminDashboardPage() {
                         <th className="text-left px-4 py-3 font-medium">分类</th>
                         <th className="text-center px-4 py-3 font-medium w-16">精选</th>
                         <th className="text-center px-4 py-3 font-medium w-16">Banner</th>
+                        <th className="text-center px-4 py-3 font-medium w-16">状态</th>
                         <th className="text-left px-4 py-3 font-medium">阅读</th>
                         <th className="text-left px-4 py-3 font-medium">时间</th>
                         <th className="text-right px-4 py-3 font-medium">操作</th>
@@ -322,6 +327,7 @@ export default function AdminDashboardPage() {
                         <td className="px-4 py-3 text-brand-500">{a.category_name}</td>
                         <td className="px-4 py-3 text-center">{a.is_featured ? <span className="text-xs px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full font-medium">精选</span> : <span className="text-brand-300">-</span>}</td>
                         <td className="px-4 py-3 text-center">{a.is_banner ? <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full font-medium">🎬 Banner</span> : <span className="text-brand-300">-</span>}</td>
+                        <td className="px-4 py-3 text-center">{a.status === 'draft' ? <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full font-medium">草稿</span> : <span className="text-xs px-2 py-0.5 bg-green-50 text-green-600 rounded-full font-medium">已发布</span>}</td>
                         <td className="px-4 py-3 text-brand-500">{a.view_count}</td>
                         <td className="px-4 py-3 text-brand-400 whitespace-nowrap text-xs">{new Date(a.published_at).toLocaleDateString('zh-CN')}</td>
                         <td className="px-4 py-3 text-right">
@@ -330,7 +336,7 @@ export default function AdminDashboardPage() {
                         </td>
                       </tr>
                     ))}
-                    {articles.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center text-brand-400">暂无文章</td></tr>}
+                    {articles.length === 0 && <tr><td colSpan={8} className="px-4 py-12 text-center text-brand-400">暂无文章</td></tr>}
                   </tbody>
                 </table>
               </div>

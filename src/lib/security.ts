@@ -78,6 +78,8 @@ export function generateSlug(title: string): string {
 // Input validation helpers
 export function validateArticleInput(data: any): string[] {
   const errors: string[] = [];
+  const isDraft = data.status === 'draft';
+
   if (!data.title || typeof data.title !== 'string' || data.title.trim().length === 0) {
     errors.push('标题不能为空');
   }
@@ -86,6 +88,10 @@ export function validateArticleInput(data: any): string[] {
   }
   if (!data.category_id || isNaN(Number(data.category_id))) {
     errors.push('请选择分类');
+  }
+  // 发布时必须有内容，草稿可以没有
+  if (!isDraft && (!data.content || data.content.replace(/<[^>]*>/g, '').trim().length < 10)) {
+    errors.push('正文内容太短，请至少输入10个有效字符');
   }
   // HTML 源码长度上限（含标签、图片base64等），设为 5MB 以容纳富媒体内容
   if (data.content && data.content.length > 5_000_000) {
