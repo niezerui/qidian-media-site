@@ -87,8 +87,9 @@ export function validateArticleInput(data: any): string[] {
   if (!data.category_id || isNaN(Number(data.category_id))) {
     errors.push('请选择分类');
   }
-  if (data.content && data.content.length > 100000) {
-    errors.push('内容不能超过100000字符');
+  // HTML 源码长度上限（含标签、图片base64等），设为 5MB 以容纳富媒体内容
+  if (data.content && data.content.length > 5_000_000) {
+    errors.push('内容HTML源码过大，请减少图片大小或数量');
   }
   return errors;
 }
