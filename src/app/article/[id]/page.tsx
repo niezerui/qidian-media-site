@@ -8,6 +8,8 @@ import { siteConfig } from '@/lib/site.config';
 import { getImageUrl } from '@/lib/image';
 import ViewTracker from '@/components/ViewTracker';
 
+const SITE_URL = 'https://www.qidianyanjiushe.com';
+
 async function getArticle(slug: string) {
   try {
     const article = await queryOne(
@@ -61,6 +63,9 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
       description: article.summary || article.title,
       images: coverImg ? [coverImg] : [],
     },
+    alternates: {
+      canonical: `${SITE_URL}/article/${params.id}`,
+    },
   };
 }
 
@@ -71,7 +76,6 @@ export default async function ArticleDetailPage({ params }: { params: { id: stri
   const { article, related } = data;
   const date = new Date(article.published_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
   const coverImg = article.cover_image || extractFirstImage(article.content);
-  const SITE_URL = 'https://www.qidianyanjiushe.com';
 
   // JSON-LD 文章结构化数据
   const jsonLd = {

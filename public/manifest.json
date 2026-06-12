@@ -1,0 +1,19 @@
+{
+  "name": "奇点研究社",
+  "short_name": "奇点",
+  "description": "用有趣、好玩的视角，看科技，看人文，找寻时代奇点",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#121212",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["news", "technology"],
+  "lang": "zh-CN"
+}
