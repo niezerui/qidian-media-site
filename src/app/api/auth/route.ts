@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryOne } from '@/lib/db';
-import { verifyPassword, generateToken, setAuthCookie } from '@/lib/auth';
+import { verifyPassword, generateToken, setAuthCookie, clearAuthCookie } from '@/lib/auth';
 import { sanitizeInput, checkRateLimit } from '@/lib/security';
 
 export async function POST(request: NextRequest) {
@@ -42,4 +42,10 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
+}
+
+export async function DELETE() {
+  const response = NextResponse.json({ success: true });
+  response.headers.set('Set-Cookie', clearAuthCookie());
+  return response;
 }
