@@ -10,6 +10,8 @@ export default function AdminDashboardPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'articles' | 'flashes' | 'settings'>('articles');
   const [articles, setArticles] = useState<any[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft'>('all');
+  const filteredArticles = articles.filter(a => statusFilter === 'all' ? true : a.status === statusFilter || (statusFilter === 'published' && !a.status));
   const [flashes, setFlashes] = useState<any[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -240,7 +242,7 @@ export default function AdminDashboardPage() {
         {/* ========== ARTICLES ========== */}
         {activeTab === 'articles' && (
           <div>
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-brand-900">文章列表 ({articles.length})</h2>
               <div className="flex items-center gap-3">
                 <button onClick={() => { setShowImportPanel(!showImportPanel); setShowArticleForm(false); }} className="px-4 py-2 border-2 border-green-500 text-green-600 text-sm font-medium rounded-lg hover:bg-green-50 transition-colors">
@@ -248,6 +250,28 @@ export default function AdminDashboardPage() {
                 </button>
                 <button onClick={() => { resetArticleForm(); setShowArticleForm(true); setShowImportPanel(false); }} className="px-4 py-2 bg-brand-900 text-white text-sm font-medium rounded-lg hover:bg-brand-800">+ 新建文章</button>
               </div>
+            </div>
+
+            {/* 状态筛选 */}
+            <div className="flex items-center gap-2 mb-4">
+              <button
+                onClick={() => setStatusFilter('all')}
+                className={`px-4 py-1.5 text-xs font-medium rounded-full transition-colors ${statusFilter === 'all' ? 'bg-brand-900 text-white' : 'text-brand-500 hover:text-brand-900 bg-white border border-brand-200'}`}
+              >
+                全部 ({articles.length})
+              </button>
+              <button
+                onClick={() => setStatusFilter('published')}
+                className={`px-4 py-1.5 text-xs font-medium rounded-full transition-colors ${statusFilter === 'published' ? 'bg-green-600 text-white' : 'text-green-600 hover:text-green-700 bg-white border border-green-200'}`}
+              >
+                已发布 ({articles.filter(a => a.status === 'published' || !a.status).length})
+              </button>
+              <button
+                onClick={() => setStatusFilter('draft')}
+                className={`px-4 py-1.5 text-xs font-medium rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'draft' ? 'bg-amber-500 text-white' : 'text-amber-600 hover:text-amber-700 bg-white border border-amber-200'}`}
+              >
+                📝 草稿箱 ({articles.filter(a => a.status === 'draft').length})
+              </button>
             </div>
 
             {/* WeChat Import Panel */}
@@ -439,7 +463,7 @@ export default function AdminDashboardPage() {
                       </tr>
                     </thead>
                   <tbody className="divide-y divide-brand-50">
-                    {articles.map(a => (
+                    {filteredArticles.map(a => (
                       <tr key={a.id} className="hover:bg-brand-50/50">
                         <td className="px-4 py-3 text-brand-900 font-medium max-w-[300px] truncate">{a.title}</td>
                         <td className="px-4 py-3 text-brand-500">{a.category_name}</td>
@@ -454,7 +478,7 @@ export default function AdminDashboardPage() {
                         </td>
                       </tr>
                     ))}
-                    {articles.length === 0 && <tr><td colSpan={8} className="px-4 py-12 text-center text-brand-400">暂无文章</td></tr>}
+                    {filteredArticles.length === 0 && <tr><td colSpan={8} className="px-4 py-12 text-center text-brand-400">{statusFilter === 'draft' ? '草稿箱为空' : '暂无文章'}</td></tr>}
                   </tbody>
                 </table>
               </div>

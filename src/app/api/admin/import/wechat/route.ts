@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { execute, query } from '@/lib/db';
+import { execute, query, queryOne } from '@/lib/db';
 import { sanitizeRichContent, generateSlug, sanitizeInput } from '@/lib/security';
 
 /**
@@ -173,7 +173,12 @@ export async function POST(request: NextRequest) {
 
     // 如果自动创建，直接保存到数据库
     if (autoCreate && categoryId) {
-      const slug = generateSlug(article.title);
+      let slug = generateSlug(article.title);
+      // 检查 slug 是否重复
+      const existing = await queryOne('SELECT id FROM articles WHERE slug = ?', [slug]);
+      if (existing) {
+        slug = `${slug}-${Date.now()}`;
+      }
       const sourceNote = article.sourceName ? `\n\n<p style="color:#999;font-size:14px;">来源：公众号「${article.sourceName}」</p>` : '';
 
       const result = await execute(
