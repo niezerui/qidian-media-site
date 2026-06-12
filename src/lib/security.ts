@@ -17,7 +17,8 @@ export function sanitizeRichContent(html: string): string {
     ]),
     allowedAttributes: {
       ...sanitizeHtml.defaults.allowedAttributes,
-      img: ['src', 'alt', 'width', 'height', 'loading'],
+      '*': ['style', 'class', 'id'],  // 允许通用样式属性（微信公众号文章依赖内联样式）
+      img: ['src', 'alt', 'width', 'height', 'loading', 'data-src', 'data-type', 'data-ratio', 'data-w'],
       video: ['src', 'controls', 'width', 'height', 'poster'],
       source: ['src', 'type'],
       iframe: ['src', 'width', 'height', 'frameborder', 'allowfullscreen'],
