@@ -12,7 +12,10 @@ export default async function sitemap() {
   // 静态页
   const staticPages = [
     { url: SITE_URL, lastModified: now, changeFrequency: 'hourly' as const, priority: 1.0 },
+    { url: `${SITE_URL}/about`, lastModified: now, changeFrequency: 'monthly' as const, priority: 0.5 },
     { url: `${SITE_URL}/contact`, lastModified: now, changeFrequency: 'monthly' as const, priority: 0.3 },
+    { url: `${SITE_URL}/join`, lastModified: now, changeFrequency: 'monthly' as const, priority: 0.3 },
+    { url: `${SITE_URL}/advertise`, lastModified: now, changeFrequency: 'monthly' as const, priority: 0.3 },
   ];
 
   // 分类页
