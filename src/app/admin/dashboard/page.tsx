@@ -8,7 +8,7 @@ interface Category { id: number; slug: string; name: string; }
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'articles' | 'flashes'>('articles');
+  const [activeTab, setActiveTab] = useState<'articles' | 'flashes' | 'settings'>('articles');
   const [articles, setArticles] = useState<any[]>([]);
   const [flashes, setFlashes] = useState<any[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -16,7 +16,7 @@ export default function AdminDashboardPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Article form
+  // ========== Article form ==========
   const [showArticleForm, setShowArticleForm] = useState(false);
   const [editingArticle, setEditingArticle] = useState<any>(null);
   const [articleForm, setArticleForm] = useState({
@@ -26,14 +26,26 @@ export default function AdminDashboardPage() {
     published_at: '',
   });
 
-  // Flash form
+  // ========== Flash form ==========
   const [showFlashForm, setShowFlashForm] = useState(false);
   const [flashForm, setFlashForm] = useState({ title: '', content: '', date_label: '' });
 
-  // Category add
+  // ========== Category add ==========
   const [showCatAdd, setShowCatAdd] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [newCatName, setNewCatName] = useState('');
+
+  // ========== WeChat Import ==========
+  const [showImportPanel, setShowImportPanel] = useState(false);
+  const [importUrl, setImportUrl] = useState('');
+  const [importCategory, setImportCategory] = useState('');
+  const [importing, setImporting] = useState(false);
+
+  // ========== Password change ==========
+  const [pwOld, setPwOld] = useState('');
+  const [pwNew, setPwNew] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
+  const [pwChanging, setPwChanging] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -51,7 +63,7 @@ export default function AdminDashboardPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Add category
+  // ========== Category ==========
   const handleAddCategory = async () => {
     if (!newCatName.trim()) return;
     try {
@@ -74,7 +86,7 @@ export default function AdminDashboardPage() {
     } catch { setError('网络错误'); }
   };
 
-  // Article submit / save draft
+  // ========== Article CRUD ==========
   const saveArticle = async (status: 'draft' | 'published') => {
     const tags = articleForm.tags.split(',').map(t => t.trim()).filter(Boolean).slice(0, 5).map(t => t.length > 8 ? t.slice(0, 8) : t);
     const method = editingArticle ? 'PUT' : 'POST';
@@ -129,7 +141,33 @@ export default function AdminDashboardPage() {
     fetchData();
   };
 
-  // Flash CRUD
+  // ========== WeChat Import ==========
+  const handleWechatImport = async () => {
+    if (!importUrl.trim()) { setError('请粘贴公众号文章链接'); return; }
+    if (!importCategory) { setError('请选择分类'); return; }
+    setImporting(true);
+    setError('');
+    try {
+      const res = await fetch('/api/admin/import/wechat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: importUrl.trim(), category_id: parseInt(importCategory), autoCreate: true }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccess(data.data.message || '导入成功');
+        setTimeout(() => setSuccess(''), 3000);
+        setImportUrl('');
+        setShowImportPanel(false);
+        fetchData();
+      } else {
+        setError(data.error || '导入失败');
+      }
+    } catch { setError('网络错误，请检查链接是否可访问'); }
+    finally { setImporting(false); }
+  };
+
+  // ========== Flash CRUD ==========
   const handleFlashSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -144,6 +182,32 @@ export default function AdminDashboardPage() {
     if (!confirm('确定删除？')) return;
     await fetch(`/api/admin/flashes?id=${id}`, { method: 'DELETE' });
     fetchData();
+  };
+
+  // ========== Password Change ==========
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pwOld || !pwNew || !pwConfirm) { setError('请填写所有密码字段'); return; }
+    if (pwNew.length < 6) { setError('新密码至少需要6个字符'); return; }
+    if (pwNew !== pwConfirm) { setError('两次输入的新密码不一致'); return; }
+    setPwChanging(true);
+    setError('');
+    try {
+      const res = await fetch('/api/admin/change-password', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldPassword: pwOld, newPassword: pwNew }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccess('密码修改成功，请重新登录');
+        setPwOld(''); setPwNew(''); setPwConfirm('');
+        setTimeout(() => router.push('/admin/login'), 2000);
+      } else {
+        setError(data.error || '修改失败');
+      }
+    } catch { setError('网络错误'); }
+    finally { setPwChanging(false); }
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin w-8 h-8 border-2 border-brand-900 border-t-transparent rounded-full" /></div>;
@@ -170,6 +234,7 @@ export default function AdminDashboardPage() {
         <div className="flex items-center gap-1 mb-8 bg-white rounded-lg border border-brand-100 p-1 w-fit">
           <button onClick={() => setActiveTab('articles')} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'articles' ? 'bg-brand-900 text-white' : 'text-brand-500 hover:text-brand-900'}`}>文章管理</button>
           <button onClick={() => setActiveTab('flashes')} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'flashes' ? 'bg-brand-900 text-white' : 'text-brand-500 hover:text-brand-900'}`}>快讯管理</button>
+          <button onClick={() => setActiveTab('settings')} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'settings' ? 'bg-brand-900 text-white' : 'text-brand-500 hover:text-brand-900'}`}>⚙ 设置</button>
         </div>
 
         {/* ========== ARTICLES ========== */}
@@ -177,8 +242,61 @@ export default function AdminDashboardPage() {
           <div>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold text-brand-900">文章列表 ({articles.length})</h2>
-              <button onClick={() => { resetArticleForm(); setShowArticleForm(true); }} className="px-4 py-2 bg-brand-900 text-white text-sm font-medium rounded-lg hover:bg-brand-800">+ 新建文章</button>
+              <div className="flex items-center gap-3">
+                <button onClick={() => { setShowImportPanel(!showImportPanel); setShowArticleForm(false); }} className="px-4 py-2 border-2 border-green-500 text-green-600 text-sm font-medium rounded-lg hover:bg-green-50 transition-colors">
+                  📥 导入公众号文章
+                </button>
+                <button onClick={() => { resetArticleForm(); setShowArticleForm(true); setShowImportPanel(false); }} className="px-4 py-2 bg-brand-900 text-white text-sm font-medium rounded-lg hover:bg-brand-800">+ 新建文章</button>
+              </div>
             </div>
+
+            {/* WeChat Import Panel */}
+            {showImportPanel && (
+              <div className="bg-white border-2 border-green-200 rounded-xl p-6 mb-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base font-bold text-brand-900 flex items-center gap-2">
+                    <span className="text-green-500">📥</span> 导入公众号文章
+                  </h3>
+                  <button onClick={() => setShowImportPanel(false)} className="text-brand-400 hover:text-brand-600 text-lg">&times;</button>
+                </div>
+                <p className="text-sm text-brand-500 mb-4">粘贴微信公众号文章链接，自动抓取标题、封面和正文，保存为草稿。</p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-brand-700 mb-1">文章链接 *</label>
+                    <input
+                      type="url"
+                      value={importUrl}
+                      onChange={e => setImportUrl(e.target.value)}
+                      placeholder="https://mp.weixin.qq.com/s/..."
+                      className="w-full px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-green-500 text-sm font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-700 mb-1">所属分类 *</label>
+                    <select
+                      value={importCategory}
+                      onChange={e => setImportCategory(e.target.value)}
+                      className="w-60 px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-green-500 text-sm"
+                    >
+                      <option value="">选择分类</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleWechatImport}
+                      disabled={importing}
+                      className={`px-6 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg transition-colors ${importing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-700'}`}
+                    >
+                      {importing ? '⏳ 正在抓取...' : '📥 开始导入'}
+                    </button>
+                    <button onClick={() => setShowImportPanel(false)} className="px-4 py-2.5 border border-brand-200 text-brand-600 text-sm rounded-lg hover:bg-brand-50">取消</button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {showArticleForm && (
               <div className="bg-white border border-brand-100 rounded-xl p-6 mb-6 shadow-sm">
@@ -400,6 +518,67 @@ export default function AdminDashboardPage() {
                   {flashes.length === 0 && <tr><td colSpan={4} className="px-4 py-12 text-center text-brand-400">暂无快讯</td></tr>}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* ========== SETTINGS ========== */}
+        {activeTab === 'settings' && (
+          <div>
+            <div className="max-w-lg">
+              {/* Password Change */}
+              <div className="bg-white border border-brand-100 rounded-xl p-6 shadow-sm">
+                <h3 className="text-base font-bold text-brand-900 mb-1">修改密码</h3>
+                <p className="text-sm text-brand-400 mb-6">修改管理员登录密码，修改后需要重新登录。</p>
+                <form onSubmit={handlePasswordChange} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-brand-700 mb-1">当前密码</label>
+                    <input
+                      type="password"
+                      value={pwOld}
+                      onChange={e => setPwOld(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-brand-900 text-sm"
+                      required
+                      autoComplete="current-password"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-700 mb-1">新密码</label>
+                    <input
+                      type="password"
+                      value={pwNew}
+                      onChange={e => setPwNew(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-brand-900 text-sm"
+                      required
+                      minLength={6}
+                      placeholder="至少6个字符"
+                      autoComplete="new-password"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-700 mb-1">确认新密码</label>
+                    <input
+                      type="password"
+                      value={pwConfirm}
+                      onChange={e => setPwConfirm(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-brand-900 text-sm"
+                      required
+                      minLength={6}
+                      placeholder="再次输入新密码"
+                      autoComplete="new-password"
+                    />
+                  </div>
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={pwChanging}
+                      className={`px-6 py-2.5 bg-brand-900 text-white text-sm font-medium rounded-lg transition-colors ${pwChanging ? 'opacity-50 cursor-not-allowed' : 'hover:bg-brand-800'}`}
+                    >
+                      {pwChanging ? '修改中...' : '修改密码'}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
         )}
