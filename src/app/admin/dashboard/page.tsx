@@ -39,7 +39,9 @@ export default function AdminDashboardPage() {
 
   // ========== WeChat Import ==========
   const [showImportPanel, setShowImportPanel] = useState(false);
+  const [importMode, setImportMode] = useState<'url' | 'html'>('url');
   const [importUrl, setImportUrl] = useState('');
+  const [importHtml, setImportHtml] = useState('');
   const [importCategory, setImportCategory] = useState('');
   const [importing, setImporting] = useState(false);
 
@@ -145,27 +147,35 @@ export default function AdminDashboardPage() {
 
   // ========== WeChat Import ==========
   const handleWechatImport = async () => {
-    if (!importUrl.trim()) { setError('请粘贴公众号文章链接'); return; }
     if (!importCategory) { setError('请选择分类'); return; }
+    if (importMode === 'url' && !importUrl.trim()) { setError('请粘贴公众号文章链接'); return; }
+    if (importMode === 'html' && !importHtml.trim()) { setError('请粘贴公众号文章页面源码'); return; }
     setImporting(true);
     setError('');
     try {
+      const body: any = { category_id: parseInt(importCategory), autoCreate: true };
+      if (importMode === 'url') {
+        body.url = importUrl.trim();
+      } else {
+        body.html = importHtml.trim();
+      }
       const res = await fetch('/api/admin/import/wechat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: importUrl.trim(), category_id: parseInt(importCategory), autoCreate: true }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.success) {
         setSuccess(data.data.message || '导入成功');
         setTimeout(() => setSuccess(''), 3000);
         setImportUrl('');
+        setImportHtml('');
         setShowImportPanel(false);
         fetchData();
       } else {
         setError(data.error || '导入失败');
       }
-    } catch { setError('网络错误，请检查链接是否可访问'); }
+    } catch { setError('网络错误，请稍后重试'); }
     finally { setImporting(false); }
   };
 
@@ -283,42 +293,97 @@ export default function AdminDashboardPage() {
                   </h3>
                   <button onClick={() => setShowImportPanel(false)} className="text-brand-400 hover:text-brand-600 text-lg">&times;</button>
                 </div>
-                <p className="text-sm text-brand-500 mb-4">粘贴微信公众号文章链接，自动抓取标题、封面和正文，保存为草稿。</p>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-brand-700 mb-1">文章链接 *</label>
-                    <input
-                      type="url"
-                      value={importUrl}
-                      onChange={e => setImportUrl(e.target.value)}
-                      placeholder="https://mp.weixin.qq.com/s/..."
-                      className="w-full px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-green-500 text-sm font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-brand-700 mb-1">所属分类 *</label>
-                    <select
-                      value={importCategory}
-                      onChange={e => setImportCategory(e.target.value)}
-                      className="w-60 px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-green-500 text-sm"
-                    >
-                      <option value="">选择分类</option>
-                      {categories.map(cat => (
-                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={handleWechatImport}
-                      disabled={importing}
-                      className={`px-6 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg transition-colors ${importing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-700'}`}
-                    >
-                      {importing ? '⏳ 正在抓取...' : '📥 开始导入'}
-                    </button>
-                    <button onClick={() => setShowImportPanel(false)} className="px-4 py-2.5 border border-brand-200 text-brand-600 text-sm rounded-lg hover:bg-brand-50">取消</button>
-                  </div>
+
+                {/* 模式切换 */}
+                <div className="flex gap-2 mb-4">
+                  <button onClick={() => setImportMode('url')} className={`px-4 py-1.5 text-xs font-medium rounded-full transition-colors ${importMode === 'url' ? 'bg-green-600 text-white' : 'text-green-600 bg-white border border-green-200'}`}>🔗 链接导入</button>
+                  <button onClick={() => setImportMode('html')} className={`px-4 py-1.5 text-xs font-medium rounded-full transition-colors ${importMode === 'html' ? 'bg-green-600 text-white' : 'text-green-600 bg-white border border-green-200'}`}>📋 粘贴 HTML 源码</button>
                 </div>
+
+                {importMode === 'url' ? (
+                  <div className="space-y-4">
+                    <p className="text-sm text-brand-500">粘贴公众号文章链接，服务端自动抓取（若抓取失败请使用「粘贴 HTML 源码」模式）。</p>
+                    <div>
+                      <label className="block text-sm font-medium text-brand-700 mb-1">文章链接 *</label>
+                      <input
+                        type="url"
+                        value={importUrl}
+                        onChange={e => setImportUrl(e.target.value)}
+                        placeholder="https://mp.weixin.qq.com/s/..."
+                        className="w-full px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-green-500 text-sm font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-brand-700 mb-1">所属分类 *</label>
+                      <select
+                        value={importCategory}
+                        onChange={e => setImportCategory(e.target.value)}
+                        className="w-60 px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-green-500 text-sm"
+                      >
+                        <option value="">选择分类</option>
+                        {categories.map(cat => (
+                          <option key={cat.id} value={cat.id}>{cat.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={handleWechatImport}
+                        disabled={importing}
+                        className={`px-6 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg transition-colors ${importing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-700'}`}
+                      >
+                        {importing ? '⏳ 正在抓取...' : '📥 开始导入'}
+                      </button>
+                      <button onClick={() => setShowImportPanel(false)} className="px-4 py-2.5 border border-brand-200 text-brand-600 text-sm rounded-lg hover:bg-brand-50">取消</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+                      <p className="font-medium mb-1">📋 如何使用「粘贴 HTML 源码」模式：</p>
+                      <ol className="list-decimal list-inside space-y-1 text-xs">
+                        <li>在浏览器中打开公众号文章链接</li>
+                        <li>右键 → <code className="bg-amber-100 px-1 rounded">查看网页源代码</code></li>
+                        <li><code className="bg-amber-100 px-1 rounded">Ctrl+A</code> 全选 → <code className="bg-amber-100 px-1 rounded">Ctrl+C</code> 复制</li>
+                        <li>回到本页面，粘贴到下方文本框</li>
+                        <li>选择分类，点击「导入」</li>
+                      </ol>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-brand-700 mb-1">页面源码 *</label>
+                      <textarea
+                        value={importHtml}
+                        onChange={e => setImportHtml(e.target.value)}
+                        placeholder="粘贴公众号文章页面源码（右键 → 查看网页源代码 → 全选复制）"
+                        rows={10}
+                        className="w-full px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-green-500 text-xs font-mono resize-y"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-brand-700 mb-1">所属分类 *</label>
+                      <select
+                        value={importCategory}
+                        onChange={e => setImportCategory(e.target.value)}
+                        className="w-60 px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-green-500 text-sm"
+                      >
+                        <option value="">选择分类</option>
+                        {categories.map(cat => (
+                          <option key={cat.id} value={cat.id}>{cat.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={handleWechatImport}
+                        disabled={importing}
+                        className={`px-6 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg transition-colors ${importing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-700'}`}
+                      >
+                        {importing ? '⏳ 正在解析...' : '📥 导入'}
+                      </button>
+                      <button onClick={() => setShowImportPanel(false)} className="px-4 py-2.5 border border-brand-200 text-brand-600 text-sm rounded-lg hover:bg-brand-50">取消</button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
