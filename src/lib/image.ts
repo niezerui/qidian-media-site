@@ -59,3 +59,32 @@ export function getImageUrl(url: string | null | undefined): string {
   }
   return url;
 }
+
+/**
+ * 将单个外链 URL 转为代理 URL（用于封面图等场景）
+ */
+export function proxyImageUrl(url: string): string {
+  return getImageUrl(url);
+}
+
+/**
+ * 扫描 HTML 正文中的所有 <img> 标签，将外链 src 改写为代理 URL
+ */
+export function rewriteContentImages(html: string): string {
+  if (!html) return '';
+
+  // 匹配 <img ... src="xxx" ...>
+  return html.replace(/<img\b([^>]*?)\bsrc\s*=\s*["']([^"']+)["']([^>]*)>/gi, (match, before, src, after) => {
+    // 处理 data-src（微信懒加载图片）
+    const dataSrcMatch = before.match(/data-src\s*=\s*["']([^"']+)["']/i);
+    const realSrc = dataSrcMatch ? dataSrcMatch[1] : src;
+
+    if (realSrc.startsWith('data:') || realSrc.startsWith('/') || realSrc === '') {
+      return match; // 保持原样
+    }
+
+    const proxyUrl = getImageUrl(realSrc);
+    // 用原始 src 位置替换
+    return `<img${before}src="${proxyUrl}"${after}>`;
+  });
+}

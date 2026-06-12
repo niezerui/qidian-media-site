@@ -39,17 +39,58 @@ export default function AdminDashboardPage() {
 
   // ========== WeChat Import ==========
   const [showImportPanel, setShowImportPanel] = useState(false);
-  const [importMode, setImportMode] = useState<'url' | 'html'>('url');
+  const [importMode, setImportMode] = useState<'url' | 'html' | 'wechat'>('wechat');
   const [importUrl, setImportUrl] = useState('');
   const [importHtml, setImportHtml] = useState('');
   const [importCategory, setImportCategory] = useState('');
   const [importing, setImporting] = useState(false);
+  // 公众号同步相关
+  const [wechatConfigured, setWechatConfigured] = useState<boolean | null>(null);
+  const [wechatArticles, setWechatArticles] = useState<any[]>([]);
+  const [wechatLoading, setWechatLoading] = useState(false);
+  const [selectedArticles, setSelectedArticles] = useState<Set<string>>(new Set());
 
   // ========== Password change ==========
   const [pwOld, setPwOld] = useState('');
   const [pwNew, setPwNew] = useState('');
   const [pwConfirm, setPwConfirm] = useState('');
   const [pwChanging, setPwChanging] = useState(false);
+
+  // ========== WeChat Config ==========
+  const [wechatConfigForm, setWechatConfigForm] = useState({ appId: '', appSecret: '' });
+  const [wechatConfigSaving, setWechatConfigSaving] = useState(false);
+
+  const loadWechatConfig = async () => {
+    const res = await fetch('/api/admin/wechat-config');
+    const data = await res.json();
+    setWechatConfigured(!!data.data);
+    if (data.data) setWechatConfigForm({ appId: data.data.app_id || '', appSecret: '' });
+  };
+
+  const saveWechatConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!wechatConfigForm.appId.trim() || !wechatConfigForm.appSecret.trim()) {
+      setError('请填写 AppID 和 AppSecret'); return;
+    }
+    setWechatConfigSaving(true);
+    try {
+      const res = await fetch('/api/admin/wechat-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appId: wechatConfigForm.appId.trim(), appSecret: wechatConfigForm.appSecret.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccess('公众号配置保存成功，已验证 token');
+        setTimeout(() => setSuccess(''), 3000);
+        setWechatConfigured(true);
+        setWechatConfigForm(prev => ({ ...prev, appSecret: '' }));
+      } else {
+        setError(data.error);
+      }
+    } catch { setError('保存失败'); }
+    finally { setWechatConfigSaving(false); }
+  };
 
   const fetchData = useCallback(async () => {
     try {
@@ -66,6 +107,11 @@ export default function AdminDashboardPage() {
   }, [router]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // 打开设置页时加载公众号配置
+  useEffect(() => {
+    if (activeTab === 'settings') loadWechatConfig();
+  }, [activeTab]);
 
   // ========== Category ==========
   const handleAddCategory = async () => {
@@ -177,6 +223,88 @@ export default function AdminDashboardPage() {
       }
     } catch { setError('网络错误，请稍后重试'); }
     finally { setImporting(false); }
+  };
+
+  // ========== 公众号同步 ==========
+  const checkWechatConfig = async () => {
+    const res = await fetch('/api/admin/wechat-config');
+    const data = await res.json();
+    setWechatConfigured(!!data.data);
+  };
+
+  const fetchWechatArticles = async () => {
+    setWechatLoading(true);
+    try {
+      const res = await fetch('/api/admin/wechat-articles');
+      const data = await res.json();
+      if (data.success) setWechatArticles(data.data);
+      else setError(data.error);
+    } catch { setError('获取公众号文章列表失败'); }
+    finally { setWechatLoading(false); }
+  };
+
+  const importWechatArticle = async (mediaId: string, source: string) => {
+    if (!importCategory) { setError('请先选择分类'); return; }
+    setImporting(true);
+    try {
+      const res = await fetch('/api/admin/import/wechat-official', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mediaId, source, categoryId: parseInt(importCategory) }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccess(`导入成功：${data.data.title}`);
+        setTimeout(() => setSuccess(''), 3000);
+        fetchData();
+        fetchWechatArticles(); // 重新拉取（可能需要从公众号列表移除）
+      } else {
+        setError(data.error);
+      }
+    } catch { setError('导入失败'); }
+    finally { setImporting(false); }
+  };
+
+  const batchImportWechatArticles = async () => {
+    if (!importCategory) { setError('请先选择分类'); return; }
+    if (selectedArticles.size === 0) { setError('请选择要导入的文章'); return; }
+    setImporting(true);
+    let count = 0;
+    for (const id of Array.from(selectedArticles)) {
+      const article = wechatArticles.find((a: any) => a.id === id);
+      if (!article) continue;
+      try {
+        const res = await fetch('/api/admin/import/wechat-official', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mediaId: article.mediaId, source: article.source, categoryId: parseInt(importCategory) }),
+        });
+        const data = await res.json();
+        if (data.success) count++;
+      } catch {}
+    }
+    setSelectedArticles(new Set());
+    setSuccess(`批量导入完成：成功 ${count}/${selectedArticles.size} 篇`);
+    setTimeout(() => setSuccess(''), 4000);
+    fetchData();
+    fetchWechatArticles();
+    setImporting(false);
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedArticles(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedArticles.size === wechatArticles.length) {
+      setSelectedArticles(new Set());
+    } else {
+      setSelectedArticles(new Set(wechatArticles.map((a: any) => a.id)));
+    }
   };
 
   // ========== Flash CRUD ==========
@@ -295,12 +423,109 @@ export default function AdminDashboardPage() {
                 </div>
 
                 {/* 模式切换 */}
-                <div className="flex gap-2 mb-4">
+                <div className="flex gap-2 mb-4 flex-wrap">
+                  <button onClick={() => { setImportMode('wechat'); checkWechatConfig(); }} className={`px-4 py-1.5 text-xs font-medium rounded-full transition-colors ${importMode === 'wechat' ? 'bg-green-600 text-white' : 'text-green-600 bg-white border border-green-200'}`}>📡 公众号同步</button>
                   <button onClick={() => setImportMode('url')} className={`px-4 py-1.5 text-xs font-medium rounded-full transition-colors ${importMode === 'url' ? 'bg-green-600 text-white' : 'text-green-600 bg-white border border-green-200'}`}>🔗 链接导入</button>
-                  <button onClick={() => setImportMode('html')} className={`px-4 py-1.5 text-xs font-medium rounded-full transition-colors ${importMode === 'html' ? 'bg-green-600 text-white' : 'text-green-600 bg-white border border-green-200'}`}>📋 粘贴 HTML 源码</button>
+                  <button onClick={() => setImportMode('html')} className={`px-4 py-1.5 text-xs font-medium rounded-full transition-colors ${importMode === 'html' ? 'bg-green-600 text-white' : 'text-green-600 bg-white border border-green-200'}`}>📋 粘贴 HTML</button>
                 </div>
 
-                {importMode === 'url' ? (
+                {importMode === 'wechat' ? (
+                  <div className="space-y-4">
+                    {wechatConfigured === null ? (
+                      <p className="text-sm text-brand-400">检查配置中...</p>
+                    ) : !wechatConfigured ? (
+                      <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+                        <p className="font-medium mb-2">⚠️ 尚未配置微信公众号 API</p>
+                        <p>请先前往 <button onClick={() => setActiveTab('settings')} className="text-green-600 underline font-medium">设置 → 公众号 API 配置</button>，填写你的公众号 AppID 和 AppSecret。</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-sm text-green-600">✅ 已接入公众号 API</span>
+                          <button
+                            onClick={fetchWechatArticles}
+                            disabled={wechatLoading}
+                            className="px-3 py-1.5 bg-green-100 text-green-700 text-xs font-medium rounded-lg hover:bg-green-200 transition-colors"
+                          >
+                            {wechatLoading ? '⏳ 获取中...' : '🔄 刷新文章列表'}
+                          </button>
+                        </div>
+
+                        {wechatArticles.length > 0 && (
+                          <>
+                            <div>
+                              <label className="block text-sm font-medium text-brand-700 mb-1">所属分类 *</label>
+                              <select
+                                value={importCategory}
+                                onChange={e => setImportCategory(e.target.value)}
+                                className="w-60 px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-green-500 text-sm"
+                              >
+                                <option value="">选择分类</option>
+                                {categories.map(cat => (
+                                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-brand-400">共 {wechatArticles.length} 篇</span>
+                              {selectedArticles.size > 0 && (
+                                <button
+                                  onClick={batchImportWechatArticles}
+                                  disabled={importing || !importCategory}
+                                  className="px-4 py-2 bg-brand-900 text-white text-sm font-medium rounded-lg hover:bg-brand-800 disabled:opacity-50"
+                                >
+                                  {importing ? '导入中...' : `📥 批量导入 (${selectedArticles.size})`}
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="border rounded-lg divide-y overflow-hidden max-h-[500px] overflow-y-auto" style={{borderColor:'var(--c-border)'}}>
+                              {/* 全选 */}
+                              <label className="flex items-center gap-3 px-4 py-2.5 bg-brand-50 text-xs font-medium cursor-pointer" style={{color:'var(--c-text-2)'}}>
+                                <input type="checkbox" checked={selectedArticles.size === wechatArticles.length && wechatArticles.length > 0} onChange={toggleSelectAll} className="w-4 h-4 accent-green-600" />
+                                全选
+                              </label>
+                              {wechatArticles.map((a: any) => (
+                                <label key={a.id} className="flex items-center gap-3 px-4 py-3 hover:bg-brand-50 cursor-pointer transition-colors">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedArticles.has(a.id)}
+                                    onChange={() => toggleSelect(a.id)}
+                                    className="w-4 h-4 accent-green-600 shrink-0"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-medium truncate" style={{color:'var(--c-text)'}}>{a.title}</div>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                      <span className="text-xs px-1.5 py-0.5 rounded" style={{
+                                        backgroundColor: a.source === 'draft' ? '#fef3c7' : '#dbeafe',
+                                        color: a.source === 'draft' ? '#92400e' : '#1e40af',
+                                      }}>
+                                        {a.source === 'draft' ? '草稿箱' : '已发布'}
+                                      </span>
+                                      {a.pubTime && <span className="text-xs text-brand-400">{new Date(a.pubTime).toLocaleDateString('zh-CN')}</span>}
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); importWechatArticle(a.mediaId, a.source); }}
+                                    disabled={importing || !importCategory}
+                                    className="text-xs px-3 py-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 disabled:opacity-50 shrink-0"
+                                  >
+                                    导入
+                                  </button>
+                                </label>
+                              ))}
+                            </div>
+                          </>
+                        )}
+
+                        {!wechatLoading && wechatArticles.length === 0 && (
+                          <p className="text-sm text-brand-400 py-8 text-center">暂无草稿或已发布文章，请先在公众号后台发布。</p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                ) : importMode === 'url' ? (
                   <div className="space-y-4">
                     <p className="text-sm text-brand-500">粘贴公众号文章链接，服务端自动抓取（若抓取失败请使用「粘贴 HTML 源码」模式）。</p>
                     <div>
@@ -665,6 +890,52 @@ export default function AdminDashboardPage() {
                     >
                       {pwChanging ? '修改中...' : '修改密码'}
                     </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* WeChat API Config */}
+              <div className="bg-white border border-brand-100 rounded-xl p-6 shadow-sm mt-6">
+                <h3 className="text-base font-bold text-brand-900 mb-1">📡 微信公众号 API 配置</h3>
+                <p className="text-sm text-brand-400 mb-6">
+                  配置你自己的微信公众号 AppID 和 AppSecret，即可在文章管理中一键同步公众号草稿箱和已发布文章。
+                  <br/>
+                  <span style={{color:'var(--c-text-3)'}}>如何获取？前往 </span>
+                  <a href="https://mp.weixin.qq.com/" target="_blank" rel="noopener" className="text-green-600 underline">微信公众平台</a>
+                  <span style={{color:'var(--c-text-3)'}}> → 设置与开发 → 基本配置 → 开发者ID(AppID) / 开发者密码(AppSecret)</span>
+                </p>
+                <form onSubmit={saveWechatConfig} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-brand-700 mb-1">AppID（开发者ID）</label>
+                    <input
+                      type="text"
+                      value={wechatConfigForm.appId}
+                      onChange={e => setWechatConfigForm(prev => ({ ...prev, appId: e.target.value }))}
+                      className="w-full max-w-md px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-green-500 text-sm font-mono"
+                      placeholder="wx0000000000000000"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-brand-700 mb-1">AppSecret（开发者密码）</label>
+                    <input
+                      type="password"
+                      value={wechatConfigForm.appSecret}
+                      onChange={e => setWechatConfigForm(prev => ({ ...prev, appSecret: e.target.value }))}
+                      className="w-full max-w-md px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-green-500 text-sm font-mono"
+                      placeholder={wechatConfigured ? '留空则保留当前密码' : '请输入 AppSecret'}
+                      required={!wechatConfigured}
+                    />
+                  </div>
+                  <div className="pt-2 flex items-center gap-3">
+                    <button
+                      type="submit"
+                      disabled={wechatConfigSaving}
+                      className={`px-6 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg transition-colors ${wechatConfigSaving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-700'}`}
+                    >
+                      {wechatConfigSaving ? '验证中...' : (wechatConfigured ? '更新配置' : '保存并验证')}
+                    </button>
+                    {wechatConfigured && <span className="text-sm text-green-600">✅ 已配置</span>}
                   </div>
                 </form>
               </div>

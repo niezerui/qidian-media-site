@@ -45,6 +45,18 @@ export async function ensureInit(): Promise<void> {
   // Migrate: add status column (published/draft)
   try { await db.execute(`ALTER TABLE articles ADD COLUMN status TEXT DEFAULT 'published'`); } catch {}
 
+  // Migrate: add wechat_config table
+  try {
+    await db.execute(`CREATE TABLE IF NOT EXISTS wechat_config (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      app_id TEXT NOT NULL,
+      app_secret TEXT NOT NULL,
+      access_token TEXT,
+      token_expires_at INTEGER,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+  } catch {}
+
   // Indexes (may fail if already exist, safe to retry)
   const indexes = [
     `CREATE INDEX IF NOT EXISTS idx_articles_category ON articles(category_id)`,
