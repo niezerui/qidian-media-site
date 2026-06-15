@@ -57,6 +57,22 @@ export async function ensureInit(): Promise<void> {
     )`);
   } catch {}
 
+  // Migrate: add comments table
+  try {
+    await db.execute(`CREATE TABLE IF NOT EXISTS comments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      article_id INTEGER NOT NULL,
+      parent_id INTEGER DEFAULT NULL,
+      author_name TEXT NOT NULL,
+      content TEXT NOT NULL,
+      status TEXT DEFAULT 'approved',
+      ip TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE,
+      FOREIGN KEY (parent_id) REFERENCES comments(id) ON DELETE CASCADE
+    )`);
+  } catch {}
+
   // Indexes (may fail if already exist, safe to retry)
   const indexes = [
     `CREATE INDEX IF NOT EXISTS idx_articles_category ON articles(category_id)`,

@@ -111,7 +111,6 @@ export default function ArticleCard({ article, variant = 'default' }: { article:
         <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--c-text-3)' }}>
           <span>{date}</span>
           <span>{article.author}</span>
-          {article.view_count > 0 && <span>{article.view_count} 阅读</span>}
         </div>
       </div>
     </Link>

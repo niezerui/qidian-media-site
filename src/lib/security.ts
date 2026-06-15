@@ -18,11 +18,15 @@ export function sanitizeRichContent(html: string): string {
     allowedAttributes: {
       ...sanitizeHtml.defaults.allowedAttributes,
       '*': ['style', 'class', 'id'],  // 允许通用样式属性（微信公众号文章依赖内联样式）
-      img: ['src', 'alt', 'width', 'height', 'loading', 'data-src', 'data-type', 'data-ratio', 'data-w'],
+      img: ['src', 'alt', 'width', 'height', 'loading', 'data-src', 'data-type', 'data-ratio', 'data-w', 'data-'],
       video: ['src', 'controls', 'width', 'height', 'poster'],
       source: ['src', 'type'],
       iframe: ['src', 'width', 'height', 'frameborder', 'allowfullscreen'],
       a: ['href', 'target', 'rel'],
+    },
+    allowedSchemes: ['http', 'https', 'data'],  // 允许 data: URI（base64 内嵌图片）
+    allowedSchemesByTag: {
+      img: ['src', 'data-src'],  // img src 允许 data: URI
     },
     allowedIframeHostnames: ['www.youtube.com', 'player.bilibili.com', 'v.qq.com'],
     transformTags: {
@@ -65,15 +69,25 @@ setInterval(() => {
   });
 }, 60000);
 
-// Slug generation
+// Slug generation — 支持中文标题（转拼音hash）
 export function generateSlug(title: string): string {
-  return title
+  // 先尝试英文/数字转换
+  let slug = title
     .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
+    .replace(/[^\w\s-]/g, '')   // 去除非英文字符
     .replace(/[\s_]+/g, '-')
     .replace(/-+/g, '-')
     .trim()
-    .slice(0, 100);
+    .slice(0, 80);
+
+  // 如果 slug 为空（纯中文标题），使用时间戳+随机数生成唯一 slug
+  if (!slug || slug === '-') {
+    const ts = Date.now().toString(36);
+    const rand = Math.random().toString(36).slice(2, 6);
+    slug = `article-${ts}-${rand}`;
+  }
+
+  return slug;
 }
 
 // Input validation helpers
@@ -87,16 +101,17 @@ export function validateArticleInput(data: any): string[] {
   if (data.title && data.title.length > 200) {
     errors.push('标题不能超过200字符');
   }
-  if (!data.category_id || isNaN(Number(data.category_id))) {
-    errors.push('请选择分类');
+  if (!data.category_id || isNaN(Number(data.category_id)) || Number(data.category_id) <= 0) {
+    errors.push('请选择文章分类');
   }
   // 发布时必须有内容，草稿可以没有
-  if (!isDraft && (!data.content || data.content.replace(/<[^>]*>/g, '').trim().length < 10)) {
-    errors.push('正文内容太短，请至少输入10个有效字符');
+  // 注意：内容可能只有图片（没有纯文字），因此放宽校验：只要有内容HTML就算有效
+  if (!isDraft && (!data.content || data.content.trim().length < 5)) {
+    errors.push('正文内容不能为空');
   }
-  // HTML 源码长度上限（含标签、图片base64等），设为 5MB 以容纳富媒体内容
-  if (data.content && data.content.length > 5_000_000) {
-    errors.push('内容HTML源码过大，请减少图片大小或数量');
+  // HTML 源码长度上限（含标签、图片base64等），设为 8MB 以容纳富媒体内容
+  if (data.content && data.content.length > 8_000_000) {
+    errors.push('内容过大（超过8MB），请压缩图片后重试');
   }
   return errors;
 }

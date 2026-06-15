@@ -7,6 +7,8 @@ import { cleanContent, extractFirstImage } from '@/lib/security';
 import { siteConfig } from '@/lib/site.config';
 import { getImageUrl } from '@/lib/image';
 import ViewTracker from '@/components/ViewTracker';
+import CommentSection from '@/components/CommentSection';
+import ShareBar from '@/components/ShareBar';
 
 const SITE_URL = 'https://www.qidianyanjiushe.com';
 
@@ -42,7 +44,14 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
   const data = await getArticle(params.id);
   if (!data) return { title: '404' };
   const { article } = data;
-  const coverImg = article.cover_image || extractFirstImage(article.content);
+  const rawCover = article.cover_image || extractFirstImage(article.content);
+
+  // OG Image：base64 data URI 无法被社交爬虫读取，统一改用 /api/og-image 端点
+  // 有封面（无论 base64 还是外链）均走该端点
+  const ogImageUrl = rawCover
+    ? `${SITE_URL}/api/og-image?slug=${encodeURIComponent(params.id)}`
+    : null;
+
   return {
     title: `${article.title} | ${siteConfig.name}`,
     description: article.summary || article.title,
@@ -55,13 +64,15 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
       siteName: siteConfig.name,
       publishedTime: article.published_at,
       authors: [article.author],
-      images: coverImg ? [{ url: coverImg, width: 1200, height: 630, alt: article.title }] : [],
+      images: ogImageUrl
+        ? [{ url: ogImageUrl, width: 1200, height: 630, alt: article.title }]
+        : [],
     },
     twitter: {
       card: 'summary_large_image',
       title: article.title,
       description: article.summary || article.title,
-      images: coverImg ? [coverImg] : [],
+      images: ogImageUrl ? [ogImageUrl] : [],
     },
     alternates: {
       canonical: `${SITE_URL}/article/${params.id}`,
@@ -125,7 +136,6 @@ export default async function ArticleDetailPage({ params }: { params: { id: stri
             <div className="flex flex-wrap items-center gap-3 text-sm pb-6 border-b mb-6" style={{ borderColor: 'var(--c-border)', color: 'var(--c-text-3)' }}>
               <span className="font-medium" style={{ color: 'var(--c-text-2)' }}>{article.author}</span>
               <span>{date}</span>
-              {article.view_count > 0 && <span>{article.view_count} 阅读</span>}
             </div>
 
             {/* Cover */}
@@ -140,10 +150,21 @@ export default async function ArticleDetailPage({ params }: { params: { id: stri
 
             {/* Tags */}
             {article.tags.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-10 pt-6 border-t" style={{ borderColor: 'var(--c-border)' }}>
+              <div className="flex flex-wrap gap-2 mt-8 pt-6 border-t" style={{ borderColor: 'var(--c-border)' }}>
                 {article.tags.map((t: string) => <span key={t} className="px-3 py-1 text-xs rounded-full" style={{ backgroundColor: 'var(--c-surface)', color: 'var(--c-text-2)' }}>#{t}</span>)}
               </div>
             )}
+
+            {/* Share Bar */}
+            <ShareBar
+              title={article.title}
+              summary={article.summary}
+              coverImage={coverImg && !coverImg.startsWith('data:') ? coverImg : undefined}
+              slug={params.id}
+            />
+
+            {/* Comment Section */}
+            <CommentSection articleId={article.id} />
           </div>
         </article>
 

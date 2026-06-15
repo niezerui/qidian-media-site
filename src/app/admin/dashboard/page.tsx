@@ -3,12 +3,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import RichEditor from '@/components/RichEditor';
+import CommentManager from '@/components/admin/CommentManager';
+import UserManager from '@/components/admin/UserManager';
 
 interface Category { id: number; slug: string; name: string; }
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'articles' | 'flashes' | 'settings'>('articles');
+  const [activeTab, setActiveTab] = useState<'articles' | 'flashes' | 'comments' | 'users' | 'settings'>('articles');
   const [articles, setArticles] = useState<any[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft'>('all');
   const filteredArticles = articles.filter(a => statusFilter === 'all' ? true : a.status === statusFilter || (statusFilter === 'published' && !a.status));
@@ -374,6 +376,8 @@ export default function AdminDashboardPage() {
         <div className="flex items-center gap-1 mb-8 bg-white rounded-lg border border-brand-100 p-1 w-fit">
           <button onClick={() => setActiveTab('articles')} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'articles' ? 'bg-brand-900 text-white' : 'text-brand-500 hover:text-brand-900'}`}>文章管理</button>
           <button onClick={() => setActiveTab('flashes')} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'flashes' ? 'bg-brand-900 text-white' : 'text-brand-500 hover:text-brand-900'}`}>快讯管理</button>
+          <button onClick={() => setActiveTab('comments')} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'comments' ? 'bg-brand-900 text-white' : 'text-brand-500 hover:text-brand-900'}`}>💬 评论管理</button>
+          <button onClick={() => setActiveTab('users')} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'users' ? 'bg-brand-900 text-white' : 'text-brand-500 hover:text-brand-900'}`}>👥 用户管理</button>
           <button onClick={() => setActiveTab('settings')} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'settings' ? 'bg-brand-900 text-white' : 'text-brand-500 hover:text-brand-900'}`}>⚙ 设置</button>
         </div>
 
@@ -835,6 +839,12 @@ export default function AdminDashboardPage() {
             </div>
           </div>
         )}
+
+        {/* ========== COMMENTS ========== */}
+        {activeTab === 'comments' && <CommentManager />}
+
+        {/* ========== USERS ========== */}
+        {activeTab === 'users' && <UserManager />}
 
         {/* ========== SETTINGS ========== */}
         {activeTab === 'settings' && (

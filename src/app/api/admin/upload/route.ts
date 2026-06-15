@@ -14,20 +14,21 @@ export async function POST(request: NextRequest) {
     }
 
     // 验证类型
-    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'image/avif'];
     if (!allowed.includes(file.type)) {
-      return NextResponse.json({ success: false, error: '仅支持 JPG/PNG/GIF/WebP/SVG' }, { status: 400 });
+      return NextResponse.json({ success: false, error: '仅支持 JPG/PNG/GIF/WebP/SVG/AVIF 格式' }, { status: 400 });
     }
 
-    // 大小限制 10MB
-    if (file.size > 10 * 1024 * 1024) {
-      return NextResponse.json({ success: false, error: '图片不能超过 10MB' }, { status: 400 });
+    // 大小限制 20MB
+    if (file.size > 20 * 1024 * 1024) {
+      return NextResponse.json({ success: false, error: `图片不能超过 20MB，当前 ${(file.size / 1024 / 1024).toFixed(1)}MB` }, { status: 400 });
     }
 
-    // 转 base64
+    // 转 base64 data URI
     const buffer = Buffer.from(await file.arrayBuffer());
     const base64 = buffer.toString('base64');
-    const dataUri = `data:${file.type};base64,${base64}`;
+    const mimeType = file.type || 'image/jpeg';
+    const dataUri = `data:${mimeType};base64,${base64}`;
 
     return NextResponse.json({
       success: true,
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
         url: dataUri,
         originalName: file.name,
         size: file.size,
-        type: file.type,
+        type: mimeType,
       },
     });
   } catch (error: any) {
