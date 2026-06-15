@@ -9,30 +9,51 @@ export function sanitizeInput(input: string): string {
 }
 
 // Sanitize rich HTML content (for article body)
+// 注意：data: URI 图片（base64）必须完整保留，不能截断
 export function sanitizeRichContent(html: string): string {
-  return sanitizeHtml(html, {
+  if (!html) return '';
+
+  // 第一步：提取所有 data:URI 图片，替换为占位符，绕过 sanitize-html 的 scheme 校验
+  const dataUriMap: Record<string, string> = {};
+  let counter = 0;
+  const htmlWithPlaceholders = html.replace(
+    /(<img\b[^>]*?\bsrc\s*=\s*["'])(data:[^"']+)(["'][^>]*>)/gi,
+    (_, before, dataUri, after) => {
+      const key = `__DATA_URI_${counter++}__`;
+      dataUriMap[key] = dataUri;
+      return `${before}${key}${after}`;
+    }
+  );
+
+  // 第二步：正常 sanitize（此时 img src 中没有 data: 了）
+  const sanitized = sanitizeHtml(htmlWithPlaceholders, {
     allowedTags: sanitizeHtml.defaults.allowedTags.concat([
       'img', 'video', 'source', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
       'figure', 'figcaption', 'iframe', 'pre', 'code', 'blockquote',
     ]),
     allowedAttributes: {
       ...sanitizeHtml.defaults.allowedAttributes,
-      '*': ['style', 'class', 'id'],  // 允许通用样式属性（微信公众号文章依赖内联样式）
-      img: ['src', 'alt', 'width', 'height', 'loading', 'data-src', 'data-type', 'data-ratio', 'data-w', 'data-'],
+      '*': ['style', 'class', 'id'],
+      img: ['src', 'alt', 'width', 'height', 'loading', 'data-src', 'data-type', 'data-ratio', 'data-w'],
       video: ['src', 'controls', 'width', 'height', 'poster'],
       source: ['src', 'type'],
       iframe: ['src', 'width', 'height', 'frameborder', 'allowfullscreen'],
       a: ['href', 'target', 'rel'],
     },
-    allowedSchemes: ['http', 'https', 'data'],  // 允许 data: URI（base64 内嵌图片）
-    allowedSchemesByTag: {
-      img: ['src', 'data-src'],  // img src 允许 data: URI
-    },
+    allowedSchemes: ['http', 'https', 'ftp', 'mailto', 'tel'],
     allowedIframeHostnames: ['www.youtube.com', 'player.bilibili.com', 'v.qq.com'],
     transformTags: {
       a: sanitizeHtml.simpleTransform('a', { rel: 'noopener noreferrer', target: '_blank' }),
     },
   });
+
+  // 第三步：把占位符还原为原始 data: URI
+  let result = sanitized;
+  for (const [key, dataUri] of Object.entries(dataUriMap)) {
+    result = result.replace(key, dataUri);
+  }
+
+  return result;
 }
 
 // Rate limiting (in-memory, simple implementation)

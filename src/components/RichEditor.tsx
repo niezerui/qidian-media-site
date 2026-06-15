@@ -1,17 +1,21 @@
 'use client';
 
-import { useRef, useState, useCallback, useEffect, useLayoutEffect } from 'react';
+import { useRef, useState, useCallback, useLayoutEffect } from 'react';
 
 interface RichEditorProps {
   value: string;
   onChange: (html: string) => void;
   placeholder?: string;
+  /** 当从文件导入时，回调通知父组件更新标题 */
+  onTitleImported?: (title: string) => void;
 }
 
-export default function RichEditor({ value, onChange, placeholder = '在此输入内容，支持粘贴图文...' }: RichEditorProps) {
+export default function RichEditor({ value, onChange, placeholder = '在此输入内容，支持粘贴图文...', onTitleImported }: RichEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [importing, setImporting] = useState(false);
   // 标记是否由用户输入触发的变更（避免外部 value 同步覆盖编辑器内容）
   const composingRef = useRef(false);
   const lastValueRef = useRef(value);
@@ -100,6 +104,48 @@ export default function RichEditor({ value, onChange, placeholder = '在此输�
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // 导入文件（Word / Markdown / TXT / HTML）
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/admin/import-file', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!data.success) {
+        alert(data.error || '导入失败');
+        return;
+      }
+      const { title, content } = data.data;
+      // 是否要替换当前内容
+      const currentContent = editorRef.current?.innerHTML || '';
+      if (currentContent.trim() && currentContent !== '<br>') {
+        const ok = confirm(`当前编辑器已有内容，是否用「${file.name}」的内容替换？`);
+        if (!ok) return;
+      }
+      // 注入内容到编辑器
+      if (editorRef.current) {
+        editorRef.current.innerHTML = content;
+        lastValueRef.current = content;
+        onChange(content);
+      }
+      // 如果父组件想要获取标题
+      if (title && onTitleImported) {
+        onTitleImported(title);
+      }
+      if (data.data.imageCount > 0) {
+        alert(`✅ 导入成功！文件包含 ${data.data.imageCount} 张图片，已转为内嵌图片显示。`);
+      }
+    } catch {
+      alert('导入失败，请检查文件格式');
+    } finally {
+      setImporting(false);
+      if (importFileRef.current) importFileRef.current.value = '';
     }
   };
 
@@ -196,6 +242,34 @@ export default function RichEditor({ value, onChange, placeholder = '在此输�
         <Btn onClick={insertVideo} title="插入视频">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
         </Btn>
+
+        <Divider />
+
+        {/* 文件导入（Word / MD / TXT / HTML） */}
+        <label
+          className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors cursor-pointer select-none ${importing ? 'text-brand-300' : 'text-brand-600 hover:bg-white hover:text-brand-900'}`}
+          title="从文件导入正文（支持 .docx .md .txt .html）"
+        >
+          {importing ? (
+            <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeLinecap="round"/></svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="12" y1="18" x2="12" y2="12"/>
+              <line x1="9" y1="15" x2="15" y2="15"/>
+            </svg>
+          )}
+          <span className="hidden sm:inline">{importing ? '导入中...' : '导入文件'}</span>
+          <input
+            ref={importFileRef}
+            type="file"
+            accept=".docx,.doc,.md,.txt,.html,.htm"
+            onChange={handleFileImport}
+            className="hidden"
+            disabled={importing}
+          />
+        </label>
       </div>
 
       {/* ====== 编辑区域 ====== */}

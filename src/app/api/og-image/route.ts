@@ -20,11 +20,18 @@ export async function GET(request: NextRequest) {
       return new NextResponse(null, { status: 400 });
     }
 
-    // 查询文章封面
-    const article = await queryOne(
+    // 查询文章封面（同时支持 slug 和数字 id 两种形式）
+    let article = await queryOne(
       'SELECT cover_image, content FROM articles WHERE slug = ?',
       [slug]
     );
+    // 如果 slug 是纯数字，还尝试用 id 查询（兼容旧文章）
+    if (!article && /^-?\d+$/.test(slug)) {
+      article = await queryOne(
+        'SELECT cover_image, content FROM articles WHERE id = ?',
+        [parseInt(slug)]
+      );
+    }
 
     if (!article) {
       return new NextResponse(null, { status: 404 });

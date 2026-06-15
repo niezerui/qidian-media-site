@@ -726,7 +726,8 @@ export default function AdminDashboardPage() {
                     <p className="text-xs text-brand-400 mb-2">支持直接粘贴文章（含图片、格式），选中文字可使用工具栏调整样式</p>
                     <RichEditor
                       value={articleForm.content}
-                      onChange={(html) => setArticleForm({...articleForm, content: html})}
+                      onChange={(html) => setArticleForm(prev => ({...prev, content: html}))}
+                      onTitleImported={(t) => setArticleForm(prev => ({ ...prev, title: prev.title || t }))}
                       placeholder="在此粘贴文章内容，支持图文混排..."
                     />
                   </div>
