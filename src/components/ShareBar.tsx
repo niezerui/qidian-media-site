@@ -21,6 +21,7 @@ export default function ShareBar({ title, summary, coverImage, slug }: ShareBarP
   const [currentUrl, setCurrentUrl] = useState('');
   const [isWechat, setIsWechat] = useState(false);
   const [canNativeShare, setCanNativeShare] = useState(false);
+  const [wxSdkFailed, setWxSdkFailed] = useState(false);
   const wxInitialized = useRef(false);
 
   useEffect(() => {
@@ -52,7 +53,12 @@ export default function ShareBar({ title, summary, coverImage, slug }: ShareBarP
       // 获取签名
       const res = await fetch(`/api/wechat-sign?url=${encodeURIComponent(url)}`);
       const data = await res.json();
-      if (!data.success) return;
+      if (!data.success) {
+        // needsConfig 表示后台尚未配置公众号 API，JS-SDK 无法使用
+        // 此时依赖页面 OG 标签（标题+摘要+封面）被微信爬虫抓取
+        if (data.needsConfig) setWxSdkFailed(true);
+        return;
+      }
       const { appId, timestamp, nonceStr, signature } = data.data;
 
       // 计算 og-image 绝对 URL（可被微信爬虫访问）
@@ -95,6 +101,10 @@ export default function ShareBar({ title, summary, coverImage, slug }: ShareBarP
           link: url,
           imgUrl,
         });
+      });
+
+      window.wx.error(() => {
+        setWxSdkFailed(true);
       });
     } catch (e) {
       // 静默失败，不影响用户体验
@@ -151,16 +161,23 @@ export default function ShareBar({ title, summary, coverImage, slug }: ShareBarP
       <div className="flex flex-col gap-2 py-5 border-t border-b my-6" style={{ borderColor: 'var(--c-border)' }}>
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium" style={{ color: 'var(--c-text-2)' }}>分享：</span>
-          <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full" style={{ backgroundColor: '#07c160', color: 'white' }}>
+          <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full text-white" style={{ backgroundColor: '#07c160' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
               <path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 01.213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 00.167-.054l1.903-1.114a.864.864 0 01.717-.098 10.16 10.16 0 002.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 01-1.162 1.178A1.17 1.17 0 014.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 01-1.162 1.178 1.17 1.17 0 01-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 01.598.082l1.584.926a.272.272 0 00.14.047c.134 0 .24-.111.24-.247 0-.06-.023-.12-.038-.177l-.327-1.233a.582.582 0 01.182-.556C23.024 18.21 24 16.705 24 14.995c0-3.232-2.922-5.892-7.062-6.137zm-2.64 3.449c.535 0 .969.44.969.982a.976.976 0 01-.969.983.976.976 0 01-.969-.983c0-.542.434-.982.97-.982zm5.4 0c.535 0 .969.44.969.982a.976.976 0 01-.969.983.976.976 0 01-.969-.983c0-.542.434-.982.97-.982z"/>
             </svg>
             点击右上角 ··· 分享给朋友
           </div>
         </div>
-        <p className="text-xs ml-10" style={{ color: 'var(--c-text-3)' }}>
-          分享卡片将自动显示文章标题、摘要和封面图
-        </p>
+        {wxSdkFailed && (
+          <p className="text-xs ml-10" style={{ color: 'var(--c-text-3)' }}>
+            分享卡片将通过页面信息自动显示标题和封面图
+          </p>
+        )}
+        {!wxSdkFailed && (
+          <p className="text-xs ml-10" style={{ color: 'var(--c-text-3)' }}>
+            分享卡片将自动显示文章标题、摘要和封面图
+          </p>
+        )}
       </div>
     );
   }

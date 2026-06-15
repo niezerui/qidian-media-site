@@ -41,19 +41,33 @@ async function getJsapiTicket(): Promise<string | null> {
 }
 
 // GET /api/wechat-sign?url=<当前页面URL>
+// 注意：此接口请在 Vercel 部署完成后才可正常调用（依赖 Turso 数据库读取 wechat_config）
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const url = searchParams.get('url');
     if (!url) return NextResponse.json({ success: false, error: '缺少 url 参数' }, { status: 400 });
 
-    const ticket = await getJsapiTicket();
-    if (!ticket) {
-      return NextResponse.json({ success: false, error: '未配置微信公众号 API 或获取 ticket 失败' }, { status: 503 });
+    // 检查是否已配置公众号
+    const config = await queryOne('SELECT app_id FROM wechat_config WHERE id = 1');
+    if (!config) {
+      console.warn('[wechat-sign] 未在后台配置微信公众号 AppID 和 AppSecret');
+      return NextResponse.json({
+        success: false,
+        error: '未配置微信公众号 API。请在后台「设置」Tab 填入 AppID 和 AppSecret',
+        needsConfig: true,
+      }, { status: 503 });
     }
 
-    const config = await queryOne('SELECT app_id FROM wechat_config WHERE id = 1');
-    if (!config) return NextResponse.json({ success: false, error: '未配置公众号' }, { status: 503 });
+    const ticket = await getJsapiTicket();
+    if (!ticket) {
+      console.error('[wechat-sign] 获取 jsapi_ticket 失败，请检查 AppID/AppSecret 是否正确');
+      return NextResponse.json({
+        success: false,
+        error: '获取微信签名失败：请检查 AppID 和 AppSecret 是否正确，以及是否已配置 IP 白名单',
+        needsConfig: true,
+      }, { status: 503 });
+    }
 
     const nonceStr = Math.random().toString(36).slice(2, 18);
     const timestamp = Math.floor(Date.now() / 1000).toString();
@@ -72,6 +86,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error: any) {
+    console.error('[wechat-sign] exception:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

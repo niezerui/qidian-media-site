@@ -46,11 +46,18 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
   const { article } = data;
   const rawCover = article.cover_image || extractFirstImage(article.content);
 
-  // OG Image：base64 data URI 无法被社交爬虫读取，统一改用 /api/og-image 端点
-  // 有封面（无论 base64 还是外链）均走该端点
-  const ogImageUrl = rawCover
-    ? `${SITE_URL}/api/og-image?slug=${encodeURIComponent(params.id)}`
-    : null;
+  // OG Image：无论图片来源，统一走 /api/og-image 端点（自动处理 base64 解码和外链代理）
+  const articleOghref = `${SITE_URL}/api/og-image?slug=${encodeURIComponent(params.id)}`;
+  // 必须有封面图才走文章专用端点，否则用站点 logo 作为兜底（保证微信卡片始终有图）
+  const ogImageUrl = rawCover ? articleOghref : `${SITE_URL}/logo.png`;
+  const ogImageMeta = {
+    url: ogImageUrl,
+    width: rawCover ? 1200 : 512,
+    height: rawCover ? 630 : 512,
+    alt: article.title,
+    // 微信爬虫额外需要 secure_url（部分场景）
+    ...(rawCover ? {} : { type: 'image/png' } as any),
+  };
 
   return {
     title: `${article.title} | ${siteConfig.name}`,
@@ -60,19 +67,18 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
       type: 'article',
       title: article.title,
       description: article.summary || article.title,
+      url: `${SITE_URL}/article/${params.id}`,
       locale: 'zh_CN',
       siteName: siteConfig.name,
       publishedTime: article.published_at,
       authors: [article.author],
-      images: ogImageUrl
-        ? [{ url: ogImageUrl, width: 1200, height: 630, alt: article.title }]
-        : [],
+      images: [ogImageMeta],
     },
     twitter: {
       card: 'summary_large_image',
       title: article.title,
       description: article.summary || article.title,
-      images: ogImageUrl ? [ogImageUrl] : [],
+      images: [ogImageUrl],
     },
     alternates: {
       canonical: `${SITE_URL}/article/${params.id}`,
