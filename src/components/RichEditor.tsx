@@ -15,18 +15,23 @@ export default function RichEditor({ value, onChange, placeholder = '在此输�
   // 标记是否由用户输入触发的变更（避免外部 value 同步覆盖编辑器内容）
   const composingRef = useRef(false);
   const lastValueRef = useRef(value);
+  // isInitialized 标记首次挂载：第一次必须无条件设置 innerHTML
+  const isInitializedRef = useRef(false);
 
-  // ⚡ 核心修复：只在初始化或外部真正改变 value 时才设置 innerHTML
+  // ⚡ 核心：只在初始化或外部真正改变 value 时才设置 innerHTML
   // 使用 useLayoutEffect 防止闪烁，且绝不在用户正在输入时覆盖
   useLayoutEffect(() => {
     const el = editorRef.current;
     if (!el) return;
-    // 如果是用户自己刚刚输入引起的 value 变化，跳过（防止光标跳前）
-    if (lastValueRef.current === value) return;
+    const isInitialized = isInitializedRef.current;
+    // 初始化完成后，如果是用户自己刚刚输入引起的 value 变化，跳过（防止光标跳前）
+    if (isInitialized && lastValueRef.current === value) return;
+    // 标记已初始化
+    isInitializedRef.current = true;
     // 外部真正改变了内容（如切换编辑文章），才覆盖
     lastValueRef.current = value;
     // 保存滚动位置，还原
-    const scrollTop = el.closest('.overflow-y-auto')?.scrollTop ?? window.scrollY;
+    const scrollTop = isInitialized ? (el.closest('.overflow-y-auto')?.scrollTop ?? window.scrollY) : 0;
     el.innerHTML = value || '';
     // 光标移到末尾
     const range = document.createRange();
@@ -36,9 +41,11 @@ export default function RichEditor({ value, onChange, placeholder = '在此输�
     sel?.removeAllRanges();
     sel?.addRange(range);
     // 还原滚动位置，防止视窗跳动
-    requestAnimationFrame(() => {
-      if (typeof scrollTop === 'number') window.scrollTo({ top: scrollTop });
-    });
+    if (isInitialized) {
+      requestAnimationFrame(() => {
+        if (typeof scrollTop === 'number') window.scrollTo({ top: scrollTop });
+      });
+    }
   }, [value]);
 
   // 内容变更回调：只更新 ref，节流调用 onChange
