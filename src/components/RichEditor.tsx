@@ -169,22 +169,77 @@ export default function RichEditor({ value, onChange, placeholder = '在此输�
     insertHtmlAtCursor(html);
   }, [exec, insertHtmlAtCursor]);
 
-  // 粘贴处理（保留基本格式，清理脏 HTML）
-  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+  // 将 blob: URL 转为 base64 data URI
+  const blobToBase64 = async (blobUrl: string): Promise<string | null> => {
+    try {
+      const res = await fetch(blobUrl);
+      const blob = await res.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return null;
+    }
+  };
+
+  // 粘贴处理（保留基本格式，清理脏 HTML；把 blob: URL 图片转为 base64）
+  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
     e.preventDefault();
     const html = e.clipboardData.getData('text/html');
     const text = e.clipboardData.getData('text/plain');
+
+    // 优先处理文件粘贴（直接粘贴图片文件）
+    const items = Array.from(e.clipboardData.items);
+    const imageItem = items.find(item => item.type.startsWith('image/'));
+    if (imageItem) {
+      const file = imageItem.getAsFile();
+      if (file) {
+        setUploading(true);
+        try {
+          const fd = new FormData();
+          fd.append('file', file);
+          const res = await fetch('/api/admin/upload', { method: 'POST', body: fd });
+          const data = await res.json();
+          if (data.success) {
+            insertHtmlAtCursor(`<img src="${data.data.url}" alt="粘贴图片" style="max-width:100%;height:auto;border-radius:8px;margin:12px 0;" />`);
+          }
+        } catch { /* ignore */ } finally {
+          setUploading(false);
+        }
+        return;
+      }
+    }
+
     if (html) {
-      const cleaned = html
+      let cleaned = html
         .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
         .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
         .replace(/\s(on\w+)=/gi, ' data-removed=');
+
+      // 检测 blob: URL 并转为 base64
+      const blobMatches = Array.from(cleaned.matchAll(/src\s*=\s*["'](blob:[^"']+)["']/gi));
+      if (blobMatches.length > 0) {
+        for (const match of blobMatches) {
+          const blobUrl = match[1];
+          const base64 = await blobToBase64(blobUrl);
+          if (base64) {
+            cleaned = cleaned.replace(blobUrl, base64);
+          } else {
+            // 无法转换的 blob 图片直接移除（避免保存后显示损坏图片）
+            cleaned = cleaned.replace(new RegExp(`<img[^>]*src=["']${blobUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["'][^>]*>`, 'gi'), '');
+          }
+        }
+      }
+
       document.execCommand('insertHTML', false, cleaned);
     } else if (text) {
       document.execCommand('insertText', false, text);
     }
     emitChange();
-  }, [emitChange]);
+  }, [emitChange, insertHtmlAtCursor]);
 
   return (
     <div className="border border-brand-200 rounded-lg overflow-hidden">

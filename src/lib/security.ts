@@ -13,23 +13,35 @@ export function sanitizeInput(input: string): string {
 export function sanitizeRichContent(html: string): string {
   if (!html) return '';
 
-  // 第一步：提取所有 data:URI 图片，替换为占位符，绕过 sanitize-html 的 scheme 校验
+  // 第一步：用更健壮的方式提取所有 img 标签中的 data:URI src
+  // 原理：先整体解析 img 标签，提取 src 属性值（无论用单引号/双引号/无引号）
   const dataUriMap: Record<string, string> = {};
   let counter = 0;
-  const htmlWithPlaceholders = html.replace(
-    /(<img\b[^>]*?\bsrc\s*=\s*["'])(data:[^"']+)(["'][^>]*>)/gi,
-    (_, before, dataUri, after) => {
-      const key = `__DATA_URI_${counter++}__`;
-      dataUriMap[key] = dataUri;
-      return `${before}${key}${after}`;
-    }
-  );
+
+  // 匹配完整 img 标签（包括自闭合和非自闭合），然后从中提取 src
+  const htmlWithPlaceholders = html.replace(/<img\b([^>]*)>/gi, (fullTag, attrs) => {
+    // 提取 src 属性值（支持双引号、单引号）
+    const srcMatch = attrs.match(/\bsrc\s*=\s*"([^"]*)"|src\s*=\s*'([^']*)'/i);
+    if (!srcMatch) return fullTag;
+    const srcValue = srcMatch[1] ?? srcMatch[2];
+    if (!srcValue || !srcValue.startsWith('data:')) return fullTag;
+
+    const key = `DATAURIPLHDR${counter++}END`;
+    dataUriMap[key] = srcValue;
+    // 用占位符替换 src 属性值
+    const newAttrs = attrs.replace(srcMatch[0], srcMatch[0].includes('"')
+      ? `src="${key}"`
+      : `src='${key}'`
+    );
+    return `<img${newAttrs}>`;
+  });
 
   // 第二步：正常 sanitize（此时 img src 中没有 data: 了）
   const sanitized = sanitizeHtml(htmlWithPlaceholders, {
     allowedTags: sanitizeHtml.defaults.allowedTags.concat([
       'img', 'video', 'source', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-      'figure', 'figcaption', 'iframe', 'pre', 'code', 'blockquote',
+      'figure', 'figcaption', 'iframe', 'pre', 'code', 'blockquote', 'table',
+      'thead', 'tbody', 'tr', 'td', 'th', 'caption', 'colgroup', 'col',
     ]),
     allowedAttributes: {
       ...sanitizeHtml.defaults.allowedAttributes,
@@ -39,6 +51,8 @@ export function sanitizeRichContent(html: string): string {
       source: ['src', 'type'],
       iframe: ['src', 'width', 'height', 'frameborder', 'allowfullscreen'],
       a: ['href', 'target', 'rel'],
+      td: ['colspan', 'rowspan', 'style'],
+      th: ['colspan', 'rowspan', 'style'],
     },
     allowedSchemes: ['http', 'https', 'ftp', 'mailto', 'tel'],
     allowedIframeHostnames: ['www.youtube.com', 'player.bilibili.com', 'v.qq.com'],
@@ -47,10 +61,11 @@ export function sanitizeRichContent(html: string): string {
     },
   });
 
-  // 第三步：把占位符还原为原始 data: URI
+  // 第三步：把占位符还原为原始 data: URI（用全局替换，防止多次出现同一 key 的情况）
   let result = sanitized;
   for (const [key, dataUri] of Object.entries(dataUriMap)) {
-    result = result.replace(key, dataUri);
+    // 占位符在 sanitize 后可能出现在 src="DATAURIPLHDR0END" 中
+    result = result.split(key).join(dataUri);
   }
 
   return result;

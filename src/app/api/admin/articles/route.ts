@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne, execute } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import { sanitizeInput, sanitizeRichContent, validateArticleInput, generateSlug, extractFirstImage } from '@/lib/security';
+import { rewriteContentImages } from '@/lib/image';
 
 export async function GET(request: NextRequest) {
   try {
@@ -65,11 +66,14 @@ export async function POST(request: NextRequest) {
     }
 
     const summary = sanitizeInput(body.summary || '');
-    const content = sanitizeRichContent(body.content || '');
+    // sanitize 清理 XSS，然后对外链图片走代理（防止防盗链导致图片失效）
+    const rawContent = body.content || '';
+    const sanitizedContent = sanitizeRichContent(rawContent);
+    const content = rewriteContentImages(sanitizedContent);
     const categoryId = parseInt(body.category_id);
     const author = sanitizeInput(body.author || '奇点编辑部');
     const tags = JSON.stringify((body.tags || []).map((t: string) => sanitizeInput(t)));
-    const coverImage = body.cover_image || extractFirstImage(body.content) || null;
+    const coverImage = body.cover_image || extractFirstImage(rawContent) || null;
     const isFeatured = body.is_featured ? 1 : 0;
     const isExclusive = body.is_exclusive ? 1 : 0;
     const isBanner = body.is_banner ? 1 : 0;
@@ -108,11 +112,13 @@ export async function PUT(request: NextRequest) {
 
     const title = sanitizeInput(body.title.trim());
     const summary = sanitizeInput(body.summary || '');
-    const content = sanitizeRichContent(body.content || '');
+    const rawContent = body.content || '';
+    const sanitizedContent = sanitizeRichContent(rawContent);
+    const content = rewriteContentImages(sanitizedContent);
     const categoryId = parseInt(body.category_id);
     const author = sanitizeInput(body.author || '奇点编辑部');
     const tags = JSON.stringify((body.tags || []).map((t: string) => sanitizeInput(t)));
-    const coverImage = body.cover_image || extractFirstImage(body.content) || null;
+    const coverImage = body.cover_image || extractFirstImage(rawContent) || null;
     const isFeatured = body.is_featured ? 1 : 0;
     const isExclusive = body.is_exclusive ? 1 : 0;
     const isBanner = body.is_banner ? 1 : 0;
