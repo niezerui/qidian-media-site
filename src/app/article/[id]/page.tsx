@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import { query, queryOne } from '@/lib/db';
 import { cleanContent, extractFirstImage } from '@/lib/security';
 import { siteConfig } from '@/lib/site.config';
-import { getImageUrl } from '@/lib/image';
+import { getImageUrl, rewriteContentImages } from '@/lib/image';
 import ViewTracker from '@/components/ViewTracker';
 import CommentSection from '@/components/CommentSection';
 import ShareBar from '@/components/ShareBar';
@@ -18,7 +18,8 @@ async function getArticle(slug: string) {
       `SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE a.slug = ?`, [slug]
     ) as any;
     if (!article) return null;
-    article.content = cleanContent(article.content || '');
+    // cleanContent 还原 JSON 转义字符，rewriteContentImages 对外链图片走代理
+    article.content = rewriteContentImages(cleanContent(article.content || ''));
     article.tags = JSON.parse(article.tags || '[]');
     // SQLite 返回整数 0/1，转成布尔值，防止 JSX 中 {0 && <Comp>} 渲染出 "0"
     article.is_exclusive = !!article.is_exclusive;

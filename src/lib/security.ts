@@ -20,19 +20,17 @@ export function sanitizeRichContent(html: string): string {
 
   // 匹配完整 img 标签（包括自闭合和非自闭合），然后从中提取 src
   const htmlWithPlaceholders = html.replace(/<img\b([^>]*)>/gi, (fullTag, attrs) => {
-    // 提取 src 属性值（支持双引号、单引号）
-    const srcMatch = attrs.match(/\bsrc\s*=\s*"([^"]*)"|src\s*=\s*'([^']*)'/i);
+    // 精确提取 src 属性值（排除 data-src：用负向后瞻 (?<![a-z-]) 防止匹配 data-src 中的 src）
+    const srcMatch = attrs.match(/(?<![a-z-])src\s*=\s*"([^"]*)"/i)
+      || attrs.match(/(?<![a-z-])src\s*=\s*'([^']*)'/i);
     if (!srcMatch) return fullTag;
-    const srcValue = srcMatch[1] ?? srcMatch[2];
+    const srcValue = srcMatch[1];
     if (!srcValue || !srcValue.startsWith('data:')) return fullTag;
 
     const key = `DATAURIPLHDR${counter++}END`;
     dataUriMap[key] = srcValue;
-    // 用占位符替换 src 属性值
-    const newAttrs = attrs.replace(srcMatch[0], srcMatch[0].includes('"')
-      ? `src="${key}"`
-      : `src='${key}'`
-    );
+    // 精确替换 src 属性值（替换 srcMatch[0] 所代表的完整属性字符串）
+    const newAttrs = attrs.replace(srcMatch[0], `src="${key}"`);
     return `<img${newAttrs}>`;
   });
 
@@ -46,7 +44,7 @@ export function sanitizeRichContent(html: string): string {
     allowedAttributes: {
       ...sanitizeHtml.defaults.allowedAttributes,
       '*': ['style', 'class', 'id'],
-      img: ['src', 'alt', 'width', 'height', 'loading', 'data-src', 'data-type', 'data-ratio', 'data-w'],
+      img: ['src', 'alt', 'width', 'height', 'loading', 'style', 'data-src', 'data-type', 'data-ratio', 'data-w'],
       video: ['src', 'controls', 'width', 'height', 'poster'],
       source: ['src', 'type'],
       iframe: ['src', 'width', 'height', 'frameborder', 'allowfullscreen'],

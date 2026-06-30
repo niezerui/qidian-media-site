@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/auth';
 import { execute, queryOne } from '@/lib/db';
 import { sanitizeRichContent, generateSlug, sanitizeInput } from '@/lib/security';
+import { rewriteContentImages as rewriteImagesGlobal } from '@/lib/image';
 import * as cheerio from 'cheerio';
 
 /**
@@ -55,7 +56,9 @@ export async function POST(req: NextRequest) {
     }
 
     // 处理图片 URL（封面 + 正文中的图片走代理）
-    const processedContent = rewriteContentImages(article.content);
+    // 先用本文件的 rewriteContentImages 处理微信懒加载图片（data-src → src），
+    // 再用全局 rewriteImagesGlobal 处理所有外链图片
+    const processedContent = rewriteImagesGlobal(rewriteContentImages(article.content));
 
     // 安全过滤
     const safeContent = sanitizeRichContent(processedContent);
@@ -288,8 +291,9 @@ function cleanWechatContent(html: string): string {
   cleaned = cleaned.replace(/<p[^>]*>\s*<\/p>/gi, '');
   cleaned = cleaned.replace(/<section[^>]*>\s*<\/section>/gi, '');
 
-  // 移除微信特有属性
-  cleaned = cleaned.replace(/\sdata-[a-z-]+=["'][^"']*["']/gi, '');
+  // 移除微信特有属性（但保留 data-src，图片懒加载依赖它）
+  // 只移除非图片相关的 data- 属性（保留 data-src / data-type 等图片属性）
+  cleaned = cleaned.replace(/\s(data-(?!src\b|type\b|ratio\b|w\b)[a-z-]+)=["'][^"']*["']/gi, '');
   cleaned = cleaned.replace(/\s(wxrevtag|richtext|eqrcode)["'\s]/gi, ' ');
 
   return cleaned.trim();
@@ -297,12 +301,55 @@ function cleanWechatContent(html: string): string {
 
 // ========== 图片代理 ==========
 
+/**
+ * 将微信文章中的图片 URL 改写为代理 URL
+ * 处理两种情况：
+ * 1. 普通 src="https://mmbiz.qpic.cn/..." 直接代理
+ * 2. 微信懒加载：src="" + data-src="https://mmbiz.qpic.cn/..."（先还原 src，再代理）
+ */
 function rewriteContentImages(content: string): string {
   if (!content) return '';
-  return content.replace(/<img\b[^>]*src=["'](https?:\/\/mmbiz\.qpic\.cn\/[^"']+)["'][^>]*>/gi, (match, src) => {
-    const proxyUrl = `/api/img-proxy?url=${encodeURIComponent(src)}`;
-    return match.replace(src, proxyUrl);
+
+  // 第一步：处理 data-src 懒加载图片（src 为空或缺失，真实 URL 在 data-src 中）
+  // 将 data-src 的值设为 src，并代理
+  let result = content.replace(/<img\b([^>]*?)>/gi, (fullTag, attrs) => {
+    // 检查是否有 data-src 属性
+    const dataSrcMatch = attrs.match(/\bdata-src\s*=\s*["']([^"']+)["']/i);
+    if (!dataSrcMatch) return fullTag;
+
+    const dataSrc = dataSrcMatch[1];
+    // 如果 data-src 是 mmbiz 域的图片（需要代理）
+    if (!dataSrc || (!dataSrc.startsWith('https://mmbiz') && !dataSrc.startsWith('http://mmbiz'))) {
+      return fullTag;
+    }
+
+    const proxyUrl = `/api/img-proxy?url=${encodeURIComponent(dataSrc)}`;
+
+    // 检查 src 属性是否存在且为非空
+    const srcMatch = attrs.match(/\bsrc\s*=\s*["']([^"']*)["']/i);
+    let newAttrs = attrs;
+
+    if (!srcMatch) {
+      // 没有 src 属性，添加 src
+      newAttrs = attrs + ` src="${proxyUrl}"`;
+    } else if (!srcMatch[1] || srcMatch[1].trim() === '') {
+      // src 为空，替换为代理 URL
+      newAttrs = attrs.replace(srcMatch[0], `src="${proxyUrl}"`);
+    } else {
+      // src 有值但 data-src 也有值，用 data-src 的代理 URL 覆盖 src
+      newAttrs = attrs.replace(srcMatch[0], `src="${proxyUrl}"`);
+    }
+
+    return `<img${newAttrs}>`;
   });
+
+  // 第二步：处理普通的 mmbiz.qpic.cn 外链（src 有值）
+  result = result.replace(/<img\b([^>]*?)\bsrc\s*=\s*["'](https?:\/\/mmbiz\.qpic\.cn\/[^"']+)["']([^>]*)>/gi, (match, before, src, after) => {
+    const proxyUrl = `/api/img-proxy?url=${encodeURIComponent(src)}`;
+    return `<img${before}src="${proxyUrl}"${after}>`;
+  });
+
+  return result;
 }
 
 // ========== 验证页检测 ==========
