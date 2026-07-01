@@ -18,8 +18,8 @@ async function getArticle(slug: string) {
       `SELECT a.*, c.slug as category_slug, c.name as category_name FROM articles a JOIN categories c ON a.category_id = c.id WHERE a.slug = ?`, [slug]
     ) as any;
     if (!article) return null;
-    // cleanContent 还原 JSON 转义字符，rewriteContentImages 对外链图片走代理
-    article.content = rewriteContentImages(cleanContent(article.content || ''));
+    // rewriteContentImages 对外链图片走代理，不再需要 cleanContent（保存时已 sanitize）
+    article.content = rewriteContentImages(article.content || '');
     article.tags = JSON.parse(article.tags || '[]');
     // SQLite 返回整数 0/1，转成布尔值，防止 JSX 中 {0 && <Comp>} 渲染出 "0"
     article.is_exclusive = !!article.is_exclusive;

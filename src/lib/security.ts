@@ -9,64 +9,45 @@ export function sanitizeInput(input: string): string {
 }
 
 // Sanitize rich HTML content (for article body)
-// 注意：data: URI 图片（base64）必须完整保留，不能截断
+// 直接允许 data: scheme，避免占位符机制带来的不确定性
 export function sanitizeRichContent(html: string): string {
   if (!html) return '';
 
-  // 第一步：用更健壮的方式提取所有 img 标签中的 data:URI src
-  // 原理：先整体解析 img 标签，提取 src 属性值（无论用单引号/双引号/无引号）
-  const dataUriMap: Record<string, string> = {};
-  let counter = 0;
-
-  // 匹配完整 img 标签（包括自闭合和非自闭合），然后从中提取 src
-  const htmlWithPlaceholders = html.replace(/<img\b([^>]*)>/gi, (fullTag, attrs) => {
-    // 精确提取 src 属性值（排除 data-src：用负向后瞻 (?<![a-z-]) 防止匹配 data-src 中的 src）
-    const srcMatch = attrs.match(/(?<![a-z-])src\s*=\s*"([^"]*)"/i)
-      || attrs.match(/(?<![a-z-])src\s*=\s*'([^']*)'/i);
-    if (!srcMatch) return fullTag;
-    const srcValue = srcMatch[1];
-    if (!srcValue || !srcValue.startsWith('data:')) return fullTag;
-
-    const key = `DATAURIPLHDR${counter++}END`;
-    dataUriMap[key] = srcValue;
-    // 精确替换 src 属性值（替换 srcMatch[0] 所代表的完整属性字符串）
-    const newAttrs = attrs.replace(srcMatch[0], `src="${key}"`);
-    return `<img${newAttrs}>`;
-  });
-
-  // 第二步：正常 sanitize（此时 img src 中没有 data: 了）
-  const sanitized = sanitizeHtml(htmlWithPlaceholders, {
+  return sanitizeHtml(html, {
     allowedTags: sanitizeHtml.defaults.allowedTags.concat([
       'img', 'video', 'source', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
       'figure', 'figcaption', 'iframe', 'pre', 'code', 'blockquote', 'table',
       'thead', 'tbody', 'tr', 'td', 'th', 'caption', 'colgroup', 'col',
+      'section', 'span', 'br', 'hr', 'em', 'strong', 'u', 's', 'sub', 'sup',
+      'mark', 'abbr', 'del', 'ins',
     ]),
     allowedAttributes: {
       ...sanitizeHtml.defaults.allowedAttributes,
       '*': ['style', 'class', 'id'],
-      img: ['src', 'alt', 'width', 'height', 'loading', 'style', 'data-src', 'data-type', 'data-ratio', 'data-w'],
-      video: ['src', 'controls', 'width', 'height', 'poster'],
+      img: ['src', 'alt', 'width', 'height', 'loading', 'style', 'class', 'id', 'data-src', 'data-type', 'data-ratio', 'data-w', 'title'],
+      video: ['src', 'controls', 'width', 'height', 'poster', 'style', 'class'],
       source: ['src', 'type'],
-      iframe: ['src', 'width', 'height', 'frameborder', 'allowfullscreen'],
-      a: ['href', 'target', 'rel'],
-      td: ['colspan', 'rowspan', 'style'],
-      th: ['colspan', 'rowspan', 'style'],
+      iframe: ['src', 'width', 'height', 'frameborder', 'allowfullscreen', 'style'],
+      a: ['href', 'target', 'rel', 'style', 'class'],
+      td: ['colspan', 'rowspan', 'style', 'class'],
+      th: ['colspan', 'rowspan', 'style', 'class'],
+      table: ['style', 'class', 'border', 'cellpadding', 'cellspacing'],
+      figure: ['style', 'class'],
+      figcaption: ['style', 'class'],
+      p: ['style', 'class'],
+      span: ['style', 'class'],
     },
-    allowedSchemes: ['http', 'https', 'ftp', 'mailto', 'tel'],
+    allowedSchemes: ['http', 'https', 'ftp', 'mailto', 'tel', 'data'],
+    allowedSchemesByTag: {
+      img: ['http', 'https', 'data'],
+      video: ['http', 'https'],
+      source: ['http', 'https'],
+    },
     allowedIframeHostnames: ['www.youtube.com', 'player.bilibili.com', 'v.qq.com'],
     transformTags: {
       a: sanitizeHtml.simpleTransform('a', { rel: 'noopener noreferrer', target: '_blank' }),
     },
   });
-
-  // 第三步：把占位符还原为原始 data: URI（用全局替换，防止多次出现同一 key 的情况）
-  let result = sanitized;
-  for (const [key, dataUri] of Object.entries(dataUriMap)) {
-    // 占位符在 sanitize 后可能出现在 src="DATAURIPLHDR0END" 中
-    result = result.split(key).join(dataUri);
-  }
-
-  return result;
 }
 
 // Rate limiting (in-memory, simple implementation)
@@ -162,9 +143,12 @@ export function validateFlashInput(data: any): string[] {
 }
 
 // ===== Content Cleaner: 修复乱码"???"问题 =====
-// 富文本编辑器内容可能含JSON转义字符，渲染前需还原
+// 只有当内容明确包含 JSON 转义序列时才处理，避免破坏正常 HTML
 export function cleanContent(html: string): string {
   if (!html) return '';
+  // 先检测是否真的需要清理（内容中是否含有 JSON 转义序列）
+  if (!/\\["'nt\\]/.test(html)) return html;
+
   return html
     .replace(/\\"/g, '"')       // JSON转义双引号
     .replace(/\\n/g, '\n')      // \n 字面量 → 真实换行
