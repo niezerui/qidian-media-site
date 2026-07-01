@@ -29,6 +29,21 @@ const NEED_PROXY_DOMAINS = [
 ];
 
 /**
+ * 解码 HTML 实体中的 &amp; &lt; &gt; &quot; &#x27; &#x2F; 等
+ * 因为 innerHTML 会把 URL 中的 & 序列化为 &amp;，需要还原
+ */
+function decodeHtmlEntities(url: string): string {
+  return url
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&#x2F;/g, '/')
+    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)));
+}
+
+/**
  * 判断是否需要代理
  */
 function needsProxy(url: string): boolean {
@@ -52,12 +67,14 @@ function needsProxy(url: string): boolean {
  */
 export function getImageUrl(url: string | null | undefined): string {
   if (!url) return '';
+  // 解码 HTML 实体（innerHTML 会把 & 序列化为 &amp;）
+  const decoded = decodeHtmlEntities(url);
   // 相对路径不处理
-  if (url.startsWith('/') || url.startsWith('data:')) return url;
-  if (needsProxy(url)) {
-    return `/api/img-proxy?url=${encodeURIComponent(url)}`;
+  if (decoded.startsWith('/') || decoded.startsWith('data:')) return decoded;
+  if (needsProxy(decoded)) {
+    return `/api/img-proxy?url=${encodeURIComponent(decoded)}`;
   }
-  return url;
+  return decoded;
 }
 
 /**
