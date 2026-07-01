@@ -105,6 +105,33 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: '缺少文章ID' }, { status: 400 });
     }
 
+    // ---- 快速切换模式：只传 id + 布尔标志位（is_banner / is_featured / is_exclusive）----
+    const QUICK_TOGGLE_FIELDS = ['is_banner', 'is_featured', 'is_exclusive', 'status'] as const;
+    const bodyKeys = Object.keys(body).filter(k => k !== 'id');
+    const isQuickToggle = bodyKeys.length > 0 && bodyKeys.every(k => (QUICK_TOGGLE_FIELDS as readonly string[]).includes(k));
+
+    if (isQuickToggle) {
+      const setParts: string[] = [];
+      const params: any[] = [];
+      for (const field of QUICK_TOGGLE_FIELDS) {
+        if (field in body) {
+          if (field === 'status') {
+            setParts.push(`status = ?`);
+            params.push(body.status === 'draft' ? 'draft' : 'published');
+          } else {
+            setParts.push(`${field} = ?`);
+            params.push(body[field] ? 1 : 0);
+          }
+        }
+      }
+      setParts.push('updated_at = CURRENT_TIMESTAMP');
+      params.push(body.id);
+      await execute(`UPDATE articles SET ${setParts.join(', ')} WHERE id = ?`, params);
+      const article = await queryOne('SELECT * FROM articles WHERE id = ?', [body.id]);
+      return NextResponse.json({ success: true, data: article });
+    }
+
+    // ---- 完整更新模式 ----
     const errors = validateArticleInput(body);
     if (errors.length > 0) {
       return NextResponse.json({ success: false, error: errors.join(', ') }, { status: 400 });

@@ -8,6 +8,20 @@ import UserManager from '@/components/admin/UserManager';
 
 interface Category { id: number; slug: string; name: string; }
 
+function EyeIcon({ open }: { open: boolean }) {
+  return open ? (
+    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+      <line x1="1" y1="1" x2="23" y2="23"/>
+    </svg>
+  ) : (
+    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  );
+}
+
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'articles' | 'flashes' | 'comments' | 'users' | 'settings'>('articles');
@@ -52,11 +66,21 @@ export default function AdminDashboardPage() {
   const [wechatLoading, setWechatLoading] = useState(false);
   const [selectedArticles, setSelectedArticles] = useState<Set<string>>(new Set());
 
+  // ========== Toast ==========
+  const [toast, setToast] = useState<{ msg: string; type?: 'success' | 'error' | 'warning' } | null>(null);
+  const showToast = (msg: string, type: 'success' | 'error' | 'warning' = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
   // ========== Password change ==========
   const [pwOld, setPwOld] = useState('');
   const [pwNew, setPwNew] = useState('');
   const [pwConfirm, setPwConfirm] = useState('');
   const [pwChanging, setPwChanging] = useState(false);
+  const [showPwOld, setShowPwOld] = useState(false);
+  const [showPwNew, setShowPwNew] = useState(false);
+  const [showPwConfirm, setShowPwConfirm] = useState(false);
 
   // ========== WeChat Config ==========
   const [wechatConfigForm, setWechatConfigForm] = useState({ appId: '', appSecret: '' });
@@ -191,6 +215,30 @@ export default function AdminDashboardPage() {
     if (!confirm('确定删除这篇文章？')) return;
     await fetch(`/api/admin/articles?id=${id}`, { method: 'DELETE' });
     fetchData();
+  };
+
+  const handleToggleBanner = async (article: any) => {
+    const currentBannerCount = articles.filter(a => a.is_banner && a.id !== article.id).length;
+    if (!article.is_banner && currentBannerCount >= 5) {
+      showToast('Banner 最多设置 5 个，请先取消其他文章的 Banner', 'warning');
+      return;
+    }
+    try {
+      const res = await fetch('/api/admin/articles', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: article.id, is_banner: !article.is_banner }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(article.is_banner ? '已取消 Banner' : '已设为 Banner');
+        fetchData();
+      } else {
+        showToast(data.error || '操作失败', 'error');
+      }
+    } catch {
+      showToast('网络错误', 'error');
+    }
   };
 
   // ========== WeChat Import ==========
@@ -368,6 +416,14 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       </header>
+
+      {/* Toast 浮层 */}
+      {toast && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 transition-all animate-fade-in
+          ${toast.type === 'warning' ? 'bg-amber-500 text-white' : toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-brand-900 text-white'}`}>
+          {toast.type === 'warning' ? '⚠️' : toast.type === 'error' ? '❌' : '✅'} {toast.msg}
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 flex justify-between"><span style={{whiteSpace:'pre-line'}}>{error}</span><button onClick={() => setError('')} className="ml-2 shrink-0">&times;</button></div>}
@@ -763,7 +819,19 @@ export default function AdminDashboardPage() {
                         <td className="px-4 py-3 text-brand-900 font-medium max-w-[300px] truncate">{a.title}</td>
                         <td className="px-4 py-3 text-brand-500">{a.category_name}</td>
                         <td className="px-4 py-3 text-center">{a.is_featured ? <span className="text-xs px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full font-medium">精选</span> : <span className="text-brand-300">-</span>}</td>
-                        <td className="px-4 py-3 text-center">{a.is_banner ? <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full font-medium">🎬 Banner</span> : <span className="text-brand-300">-</span>}</td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => handleToggleBanner(a)}
+                            title={a.is_banner ? '点击取消 Banner' : '点击设为 Banner'}
+                            className={`text-xs px-2 py-0.5 rounded-full font-medium transition-colors ${
+                              a.is_banner
+                                ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                : 'bg-brand-50 text-brand-300 hover:bg-blue-50 hover:text-blue-500'
+                            }`}
+                          >
+                            {a.is_banner ? '🎬 Banner' : '＋Banner'}
+                          </button>
+                        </td>
                         <td className="px-4 py-3 text-center">{a.status === 'draft' ? <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full font-medium">草稿</span> : <span className="text-xs px-2 py-0.5 bg-green-50 text-green-600 rounded-full font-medium">已发布</span>}</td>
                         <td className="px-4 py-3 text-brand-500">{a.view_count}</td>
                         <td className="px-4 py-3 text-brand-400 whitespace-nowrap text-xs">{new Date(a.published_at).toLocaleDateString('zh-CN')}</td>
@@ -858,40 +926,58 @@ export default function AdminDashboardPage() {
                 <form onSubmit={handlePasswordChange} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-brand-700 mb-1">当前密码</label>
-                    <input
-                      type="password"
-                      value={pwOld}
-                      onChange={e => setPwOld(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-brand-900 text-sm"
-                      required
-                      autoComplete="current-password"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showPwOld ? 'text' : 'password'}
+                        value={pwOld}
+                        onChange={e => setPwOld(e.target.value)}
+                        className="w-full px-4 py-2.5 pr-10 border border-brand-200 rounded-lg focus:outline-none focus:border-brand-900 text-sm"
+                        required
+                        autoComplete="current-password"
+                      />
+                      <button type="button" onClick={() => setShowPwOld(v => !v)} tabIndex={-1}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-400 hover:text-brand-700 transition-colors">
+                        <EyeIcon open={showPwOld} />
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-brand-700 mb-1">新密码</label>
-                    <input
-                      type="password"
-                      value={pwNew}
-                      onChange={e => setPwNew(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-brand-900 text-sm"
-                      required
-                      minLength={6}
-                      placeholder="至少6个字符"
-                      autoComplete="new-password"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showPwNew ? 'text' : 'password'}
+                        value={pwNew}
+                        onChange={e => setPwNew(e.target.value)}
+                        className="w-full px-4 py-2.5 pr-10 border border-brand-200 rounded-lg focus:outline-none focus:border-brand-900 text-sm"
+                        required
+                        minLength={6}
+                        placeholder="至少6个字符"
+                        autoComplete="new-password"
+                      />
+                      <button type="button" onClick={() => setShowPwNew(v => !v)} tabIndex={-1}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-400 hover:text-brand-700 transition-colors">
+                        <EyeIcon open={showPwNew} />
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-brand-700 mb-1">确认新密码</label>
-                    <input
-                      type="password"
-                      value={pwConfirm}
-                      onChange={e => setPwConfirm(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-brand-200 rounded-lg focus:outline-none focus:border-brand-900 text-sm"
-                      required
-                      minLength={6}
-                      placeholder="再次输入新密码"
-                      autoComplete="new-password"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showPwConfirm ? 'text' : 'password'}
+                        value={pwConfirm}
+                        onChange={e => setPwConfirm(e.target.value)}
+                        className="w-full px-4 py-2.5 pr-10 border border-brand-200 rounded-lg focus:outline-none focus:border-brand-900 text-sm"
+                        required
+                        minLength={6}
+                        placeholder="再次输入新密码"
+                        autoComplete="new-password"
+                      />
+                      <button type="button" onClick={() => setShowPwConfirm(v => !v)} tabIndex={-1}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-400 hover:text-brand-700 transition-colors">
+                        <EyeIcon open={showPwConfirm} />
+                      </button>
+                    </div>
                   </div>
                   <div className="pt-2">
                     <button
