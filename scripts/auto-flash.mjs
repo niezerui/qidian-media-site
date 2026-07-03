@@ -25,7 +25,8 @@ const RSS_SOURCES = [
   { name: 'The Robot Report', url: 'https://www.therobotreport.com/feed/', lang: 'en', maxItems: 8 },
   // 中文源
   { name: '36氪', url: 'https://36kr.com/feed', lang: 'zh', maxItems: 10 },
-  { name: '机器之心', url: 'https://www.jiqizhixin.com/rss', lang: 'zh', maxItems: 10 },
+  { name: '钛媒体', url: 'https://www.tmtpost.com/feed', lang: 'zh', maxItems: 10 },
+  { name: '雷锋网', url: 'https://www.leiphone.com/feed', lang: 'zh', maxItems: 10 },
 ];
 
 // ===== 关键词过滤 =====
