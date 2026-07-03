@@ -45,6 +45,12 @@ export async function ensureInit(): Promise<void> {
   // Migrate: add status column (published/draft)
   try { await db.execute(`ALTER TABLE articles ADD COLUMN status TEXT DEFAULT 'published'`); } catch {}
 
+  // Migrate: add source tracking columns to flash_news
+  try { await db.execute(`ALTER TABLE flash_news ADD COLUMN source TEXT DEFAULT ''`); } catch {}
+  try { await db.execute(`ALTER TABLE flash_news ADD COLUMN source_url TEXT DEFAULT ''`); } catch {}
+  try { await db.execute(`ALTER TABLE flash_news ADD COLUMN is_auto INTEGER DEFAULT 0`); } catch {}
+  try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_flash_news_source_url ON flash_news(source_url)`); } catch {}
+
   // Migrate: add wechat_config table
   try {
     await db.execute(`CREATE TABLE IF NOT EXISTS wechat_config (

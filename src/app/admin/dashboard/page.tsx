@@ -47,6 +47,9 @@ export default function AdminDashboardPage() {
   // ========== Flash form ==========
   const [showFlashForm, setShowFlashForm] = useState(false);
   const [flashForm, setFlashForm] = useState({ title: '', content: '', date_label: '' });
+  const [flashSourceFilter, setFlashSourceFilter] = useState<string>('all');
+  const [flashSelected, setFlashSelected] = useState<Set<number>>(new Set());
+  const [flashAutoStats, setFlashAutoStats] = useState<{ totalAuto: number; lastAutoTime: string | null; sources: { source: string; count: number }[] } | null>(null);
 
   // ========== Category add ==========
   const [showCatAdd, setShowCatAdd] = useState(false);
@@ -137,6 +140,16 @@ export default function AdminDashboardPage() {
   // 打开设置页时加载公众号配置
   useEffect(() => {
     if (activeTab === 'settings') loadWechatConfig();
+  }, [activeTab]);
+
+  // 打开快讯页时加载自动抓取统计
+  useEffect(() => {
+    if (activeTab === 'flashes') {
+      fetch('/api/admin/flashes/auto-import', { headers: { 'x-auto-import-key': 'qidian-flash-auto-2026-secure' } })
+        .then(r => r.json())
+        .then(d => { if (d.success) setFlashAutoStats(d); })
+        .catch(() => {});
+    }
   }, [activeTab]);
 
   // ========== Category ==========
@@ -373,6 +386,35 @@ export default function AdminDashboardPage() {
     await fetch(`/api/admin/flashes?id=${id}`, { method: 'DELETE' });
     fetchData();
   };
+
+  const handleBatchDeleteFlash = async () => {
+    if (flashSelected.size === 0) return;
+    if (!confirm(`确定批量删除 ${flashSelected.size} 条快讯？`)) return;
+    const ids = Array.from(flashSelected);
+    for (const id of ids) {
+      await fetch(`/api/admin/flashes?id=${id}`, { method: 'DELETE' });
+    }
+    setFlashSelected(new Set());
+    fetchData();
+    showToast(`已删除 ${ids.length} 条快讯`);
+  };
+
+  const toggleFlashSelect = (id: number) => {
+    setFlashSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const filteredFlashes = flashes.filter(f => {
+    if (flashSourceFilter === 'all') return true;
+    if (flashSourceFilter === 'auto') return f.is_auto === 1;
+    if (flashSourceFilter === 'manual') return !f.is_auto || f.is_auto === 0;
+    return f.source === flashSourceFilter;
+  });
+
+  const flashSources = Array.from(new Set(flashes.map(f => f.source).filter(Boolean)));
 
   // ========== Password Change ==========
   const handlePasswordChange = async (e: React.FormEvent) => {
@@ -852,10 +894,50 @@ export default function AdminDashboardPage() {
         {/* ========== FLASHES ========== */}
         {activeTab === 'flashes' && (
           <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-brand-900">快讯列表 ({flashes.length})</h2>
-              <button onClick={() => setShowFlashForm(true)} className="px-4 py-2 bg-brand-900 text-white text-sm font-medium rounded-lg hover:bg-brand-800">+ 新建快讯</button>
+            {/* 自动抓取状态卡片 */}
+            {flashAutoStats && (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4 mb-6 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white text-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1.06 6.7 2.82"/><path d="M21 3v6h-6"/></svg>
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-brand-900">自动抓取已启用</div>
+                    <div className="text-xs text-brand-500">
+                      已自动抓取 {flashAutoStats.totalAuto} 条
+                      {flashAutoStats.lastAutoTime && ` | 最近更新: ${new Date(flashAutoStats.lastAutoTime).toLocaleString('zh-CN')}`}
+                      {' | 每 2 小时自动更新'}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {flashAutoStats.sources.slice(0, 5).map((s, i) => (
+                    <span key={i} className="text-xs px-2 py-1 bg-white/60 text-brand-600 rounded-full font-medium">{s.source}: {s.count}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-brand-900">快讯列表 ({filteredFlashes.length}/{flashes.length})</h2>
+              <div className="flex items-center gap-2">
+                {flashSelected.size > 0 && (
+                  <button onClick={handleBatchDeleteFlash} className="px-3 py-2 bg-red-50 text-red-600 text-sm font-medium rounded-lg hover:bg-red-100">批量删除 ({flashSelected.size})</button>
+                )}
+                <button onClick={() => setShowFlashForm(true)} className="px-4 py-2 bg-brand-900 text-white text-sm font-medium rounded-lg hover:bg-brand-800">+ 新建快讯</button>
+              </div>
             </div>
+
+            {/* 来源筛选 */}
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              <button onClick={() => setFlashSourceFilter('all')} className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${flashSourceFilter === 'all' ? 'bg-brand-900 text-white' : 'bg-brand-50 text-brand-500 hover:bg-brand-100'}`}>全部</button>
+              <button onClick={() => setFlashSourceFilter('auto')} className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${flashSourceFilter === 'auto' ? 'bg-blue-500 text-white' : 'bg-blue-50 text-blue-500 hover:bg-blue-100'}`}>自动抓取</button>
+              <button onClick={() => setFlashSourceFilter('manual')} className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${flashSourceFilter === 'manual' ? 'bg-green-500 text-white' : 'bg-green-50 text-green-500 hover:bg-green-100'}`}>手动创建</button>
+              {flashSources.map(src => (
+                <button key={src} onClick={() => setFlashSourceFilter(src)} className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${flashSourceFilter === src ? 'bg-indigo-500 text-white' : 'bg-indigo-50 text-indigo-500 hover:bg-indigo-100'}`}>{src}</button>
+              ))}
+            </div>
+
             {showFlashForm && (
               <div className="bg-white border border-brand-100 rounded-xl p-6 mb-6 shadow-sm">
                 <h3 className="text-base font-bold text-brand-900 mb-4">新建快讯</h3>
@@ -887,22 +969,33 @@ export default function AdminDashboardPage() {
               <table className="w-full text-sm">
                 <thead className="bg-brand-50 text-brand-500">
                   <tr>
+                    <th className="text-left px-3 py-3 w-8"><input type="checkbox" checked={flashSelected.size === filteredFlashes.length && filteredFlashes.length > 0} onChange={(e) => setFlashSelected(e.target.checked ? new Set(filteredFlashes.map((f: any) => f.id)) : new Set())} className="rounded" /></th>
                     <th className="text-left px-4 py-3 font-medium">标题</th>
-                    <th className="text-left px-4 py-3 font-medium">日期</th>
+                    <th className="text-left px-4 py-3 font-medium">来源</th>
                     <th className="text-left px-4 py-3 font-medium">时间</th>
                     <th className="text-right px-4 py-3 font-medium">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-50">
-                  {flashes.map(f => (
+                  {filteredFlashes.map(f => (
                     <tr key={f.id} className="hover:bg-brand-50/50">
-                      <td className="px-4 py-3 text-brand-900 font-medium max-w-[400px] truncate">{f.title}</td>
-                      <td className="px-4 py-3 text-brand-500">{f.date_label || '-'}</td>
-                      <td className="px-4 py-3 text-brand-400 text-xs">{new Date(f.published_at).toLocaleDateString('zh-CN')}</td>
+                      <td className="px-3 py-3"><input type="checkbox" checked={flashSelected.has(f.id)} onChange={() => toggleFlashSelect(f.id)} className="rounded" /></td>
+                      <td className="px-4 py-3 text-brand-900 font-medium max-w-[400px] truncate">
+                        {f.title}
+                        {f.source_url && <a href={f.source_url} target="_blank" rel="noopener noreferrer" className="ml-2 text-xs text-blue-400 hover:text-blue-600">原文</a>}
+                      </td>
+                      <td className="px-4 py-3">
+                        {f.is_auto === 1 ? (
+                          <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full font-medium">自动 · {f.source || '未知'}</span>
+                        ) : (
+                          <span className="text-xs px-2 py-0.5 bg-green-50 text-green-600 rounded-full font-medium">手动</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-brand-400 text-xs whitespace-nowrap">{new Date(f.published_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
                       <td className="px-4 py-3 text-right"><button onClick={() => handleDeleteFlash(f.id)} className="text-xs px-2 py-1 text-red-500 hover:bg-red-50 rounded">删除</button></td>
                     </tr>
                   ))}
-                  {flashes.length === 0 && <tr><td colSpan={4} className="px-4 py-12 text-center text-brand-400">暂无快讯</td></tr>}
+                  {filteredFlashes.length === 0 && <tr><td colSpan={5} className="px-4 py-12 text-center text-brand-400">暂无快讯</td></tr>}
                 </tbody>
               </table>
             </div>

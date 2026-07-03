@@ -57,6 +57,14 @@ export default async function FlashDetailPage({ params }: { params: { id: string
               <div className="w-2 h-2 bg-accent rounded-full animate-pulse" />
               <span className="text-sm font-medium text-accent">快讯</span>
               <time className="text-sm text-brand-400">{formattedDate}</time>
+              {flash.source && (
+                <span className="text-xs px-2 py-0.5 bg-brand-50 text-brand-500 rounded-full font-medium">
+                  来源: {flash.source}
+                  {flash.source_url && (
+                    <a href={flash.source_url} target="_blank" rel="noopener noreferrer" className="ml-1 text-blue-400 hover:text-blue-600">原文</a>
+                  )}
+                </span>
+              )}
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-bold text-brand-900 leading-snug mb-8">
