@@ -20,8 +20,11 @@ module.exports = {
           950: '#0d0d0d',
         },
         accent: {
-          DEFAULT: '#c41e3a',
-          hover: '#a01830',
+          DEFAULT: '#d4af37',
+          bright: '#f4d933',
+          dark: '#b8941f',
+          light: '#f8df5e',
+          hover: '#c9a227',
         },
       },
       fontFamily: {

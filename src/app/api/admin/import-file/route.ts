@@ -1,22 +1,74 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { compressImageBuffer } from '@/lib/serverImage';
+import { optimizeContentImages } from '@/lib/mediaOptimize';
+
+/** 导入文件体积上限 */
+const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
 
 /**
  * POST /api/admin/import-file
- * 接受上传的文件（.docx, .doc, .md, .txt, .html），解析为 HTML 正文
- * 返回 { success, title, content, images } 供前端填入编辑器
+ *
+ * 两种入参（自动识别 Content-Type）：
+ *   1) multipart/form-data，字段 file —— 小文件（≤ 4MB 左右）直接上传
+ *   2) application/json，{ url, name } —— 大文件（≤ 10MB）先由浏览器直传 Vercel Blob，
+ *      服务端再从 Blob 拉取解析（绕过 Vercel Serverless 4.5MB 请求体上限）
+ *
+ * 返回 { success, data: { title, content, imageCount, warnings } } 供前端填入编辑器
  */
 export async function POST(request: NextRequest) {
   try {
     await requireAuth();
 
-    const formData = await request.formData();
-    const file = formData.get('file') as File | null;
-    if (!file) {
-      return NextResponse.json({ success: false, error: '没有上传文件' }, { status: 400 });
+    const contentType = request.headers.get('content-type') || '';
+    let fileName = '';
+    let buffer: Buffer;
+
+    if (contentType.includes('application/json')) {
+      // ===== 通道二：从 Blob URL 拉取 =====
+      const body = await request.json().catch(() => null);
+      const url: string = body?.url || '';
+      fileName = String(body?.name || 'import');
+      if (!url || !/^https?:\/\//i.test(url)) {
+        return NextResponse.json({ success: false, error: '缺少有效的文件地址' }, { status: 400 });
+      }
+      if (!/\.blob\.vercel-storage\.com\//i.test(url)) {
+        return NextResponse.json({ success: false, error: '文件地址不合法' }, { status: 400 });
+      }
+      const resp = await fetch(url);
+      if (!resp.ok) {
+        return NextResponse.json({ success: false, error: `读取文件失败（HTTP ${resp.status}）` }, { status: 502 });
+      }
+      const ab = await resp.arrayBuffer();
+      if (ab.byteLength > MAX_IMPORT_BYTES) {
+        return NextResponse.json({
+          success: false,
+          error: `文件不能超过 ${MAX_IMPORT_BYTES / 1024 / 1024}MB，当前 ${(ab.byteLength / 1024 / 1024).toFixed(1)}MB`,
+        }, { status: 400 });
+      }
+      buffer = Buffer.from(ab);
+      if (!fileName || fileName === 'import') {
+        // 从路径推断文件名（保留扩展名用于格式判定）
+        const last = decodeURIComponent(url.split('?')[0].split('/').pop() || 'import');
+        fileName = last.replace(/^[a-z0-9]+-/, '');
+      }
+    } else {
+      // ===== 通道一：直接上传文件 =====
+      const formData = await request.formData();
+      const file = formData.get('file') as File | null;
+      if (!file) {
+        return NextResponse.json({ success: false, error: '没有上传文件' }, { status: 400 });
+      }
+      fileName = file.name || '';
+      if (file.size > MAX_IMPORT_BYTES) {
+        return NextResponse.json({
+          success: false,
+          error: `文件不能超过 ${MAX_IMPORT_BYTES / 1024 / 1024}MB，当前 ${(file.size / 1024 / 1024).toFixed(1)}MB`,
+        }, { status: 400 });
+      }
+      buffer = Buffer.from(await file.arrayBuffer());
     }
 
-    const fileName = file.name || '';
     const ext = fileName.split('.').pop()?.toLowerCase() || '';
     const allowedExts = ['docx', 'doc', 'md', 'txt', 'html', 'htm'];
     if (!allowedExts.includes(ext)) {
@@ -26,13 +78,9 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    if (file.size > 20 * 1024 * 1024) {
-      return NextResponse.json({ success: false, error: '文件不能超过 20MB' }, { status: 400 });
-    }
-
-    const buffer = Buffer.from(await file.arrayBuffer());
     let title = fileName.replace(/\.[^.]+$/, ''); // 默认用文件名作标题
     let html = '';
+    const warnings: string[] = [];
     // 图片列表（base64 data URI，可在正文中内嵌显示）
     const images: { name: string; dataUri: string }[] = [];
 
@@ -40,11 +88,16 @@ export async function POST(request: NextRequest) {
       // 使用 mammoth 解析 Word 文档
       const mammoth = require('mammoth');
 
-      // 自定义图片处理：将 Word 内嵌图片转为 base64
+      // 自定义图片处理：将 Word 内嵌图片压缩后转为 base64（避免大图撑爆请求/正文）
+      // ⚠️ 必须用 readAsBase64String()：img.read('buffer') 在 mammoth 1.12+ 报
+      // ERR_ENCODING_NOT_SUPPORTED，mammoth 会静默丢弃图片导致「导入后图片全部消失」
       const result = await mammoth.convertToHtml({ buffer }, {
         convertImage: mammoth.images.imgElement((img: any) => {
-          return img.read('base64').then((imageData: string) => {
-            const dataUri = `data:${img.contentType};base64,${imageData}`;
+          return img.readAsBase64String().then(async (base64: string) => {
+            const imageBuffer = Buffer.from(base64, 'base64');
+            const contentType = img.contentType || 'image/jpeg';
+            const compressed = await compressImageBuffer(imageBuffer, contentType);
+            const dataUri = `data:${compressed.mime};base64,${compressed.buffer.toString('base64')}`;
             images.push({ name: `image_${images.length + 1}`, dataUri });
             return { src: dataUri };
           });
@@ -59,6 +112,11 @@ export async function POST(request: NextRequest) {
         ],
       });
       html = result.value;
+
+      // mammoth 诊断信息不静默：转成 warnings 返回给前端提示
+      for (const msg of result.messages || []) {
+        if (msg && msg.type === 'error') warnings.push(`图片解析失败：${msg.message || '未知错误'}`);
+      }
 
       // 尝试从 H1 提取标题
       const h1Match = html.match(/<h1[^>]*>(.*?)<\/h1>/i);
@@ -122,6 +180,9 @@ export async function POST(request: NextRequest) {
       .replace(/<p><br\s*\/?>\s*<\/p>/g, '')  // 去除只含 br 的 p
       .trim();
 
+    // 图片处理：压缩 + 超大图外置到对象存储（正文只存 URL，避免 base64 撑爆保存体）
+    html = await optimizeContentImages(html, 'import');
+
     if (!html) {
       return NextResponse.json({ success: false, error: '文件内容为空或无法解析' }, { status: 422 });
     }
@@ -132,7 +193,7 @@ export async function POST(request: NextRequest) {
         title,
         content: html,
         imageCount: images.length,
-        warnings: [],
+        warnings,
       },
     });
 

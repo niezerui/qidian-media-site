@@ -24,6 +24,12 @@ yarn-error.log*
 
 # local env files
 .env*.local
+.env.local.bak
+
+# tooling artifacts
+.playwright-cli/
+.workbuddy/
+vercel.yaml
 
 # vercel
 .vercel
@@ -34,3 +40,5 @@ next-env.d.ts
 
 # data
 /data/
+
+.vercel

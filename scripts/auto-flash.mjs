@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * 快讯自动抓取脚本
- * 从多个科技媒体RSS源抓取最新资讯，过滤后批量推送到网站API
+ * 从中文科技媒体RSS源抓取最新资讯，过滤后批量推送到网站API
  *
  * 用法: node scripts/auto-flash.mjs
  * 环境变量:
@@ -12,36 +12,25 @@
 const SITE_URL = process.env.SITE_URL || 'https://qidianyanjiushe.com';
 const API_KEY = process.env.API_KEY || 'qidian-flash-auto-2026-secure';
 const IMPORT_API = `${SITE_URL}/api/admin/flashes/auto-import`;
+const MAX_PUSH = 80;        // 每次最多推送 80 条
+const RECENT_DAYS = 7;      // 只推送最近 7 天的条目（滚动窗口，保证轮播有 50+ 条）
 
-// ===== RSS 源配置 =====
+// ===== RSS 源配置（仅中文源，2026-10-12 扩充以支撑 50 条轮播池） =====
+// 已剔除：36氪（feed 返回 HTML）、机器之心（返回 HTML）、品玩（返回 HTML）、
+//         TechWeb（500）、虎嗅（超时，偶发）；雷锋网保留但常超时，失败不影响其它源
 const RSS_SOURCES = [
-  // 英文源（RSS完善）
-  { name: 'TechCrunch', url: 'https://techcrunch.com/feed/', lang: 'en', maxItems: 10 },
-  { name: 'The Verge', url: 'https://www.theverge.com/rss/index.xml', lang: 'en', maxItems: 10 },
-  { name: 'Wired', url: 'https://www.wired.com/feed/rss', lang: 'en', maxItems: 8 },
-  { name: 'VentureBeat', url: 'https://venturebeat.com/feed/', lang: 'en', maxItems: 8 },
-  { name: 'MIT Tech Review', url: 'https://www.technologyreview.com/feed/', lang: 'en', maxItems: 8 },
-  { name: 'IEEE Spectrum Robotics', url: 'https://spectrum.ieee.org/feeds/topic/robotics.rss', lang: 'en', maxItems: 8 },
-  { name: 'The Robot Report', url: 'https://www.therobotreport.com/feed/', lang: 'en', maxItems: 8 },
-  // 中文源
-  { name: '36氪', url: 'https://36kr.com/feed', lang: 'zh', maxItems: 10 },
-  { name: '钛媒体', url: 'https://www.tmtpost.com/feed', lang: 'zh', maxItems: 10 },
-  { name: '雷锋网', url: 'https://www.leiphone.com/feed', lang: 'zh', maxItems: 10 },
+  { name: '爱范儿', url: 'https://www.ifanr.com/feed', lang: 'zh', maxItems: 20 },
+  { name: '钛媒体', url: 'https://www.tmtpost.com/feed', lang: 'zh', maxItems: 20 },
+  { name: 'IT之家', url: 'https://www.ithome.com/rss/', lang: 'zh', maxItems: 60 },
+  { name: '快科技', url: 'https://rss.mydrivers.com/rss.aspx', lang: 'zh', maxItems: 60 },
+  { name: '极客公园', url: 'https://www.geekpark.net/rss', lang: 'zh', maxItems: 30 },
+  { name: '量子位', url: 'https://www.qbitai.com/feed', lang: 'zh', maxItems: 15 },
+  { name: '新浪科技', url: 'http://rss.sina.com.cn/tech/rollnews.xml', lang: 'zh', maxItems: 15 },
+  { name: '少数派', url: 'https://sspai.com/feed', lang: 'zh', maxItems: 10 },
+  { name: '雷锋网', url: 'https://www.leiphone.com/feed', lang: 'zh', maxItems: 20 },
 ];
 
 // ===== 关键词过滤 =====
-const KEYWORDS_EN = [
-  'ai', 'artificial intelligence', 'robot', 'robotics', 'embodied',
-  'llm', 'gpt', 'chatgpt', 'openai', 'anthropic', 'gemini', 'claude',
-  'tesla', 'nvidia', 'chip', 'semiconductor', 'gpu',
-  'startup', 'funding', 'series a', 'series b', 'acquisition',
-  'ev', 'electric vehicle', 'autonomous', 'self-driving',
-  'metaverse', 'vr', 'ar', 'xr', 'apple vision',
-  'e-commerce', 'retail', 'delivery', 'supply chain',
-  'figure', 'boston dynamics', 'unitree', 'agility robotics',
-  'humanoid', 'drone', 'autonomous',
-];
-
 const KEYWORDS_ZH = [
   'AI', '人工智能', '大模型', '大语言模型', 'GPT', 'ChatGPT', 'OpenAI',
   '机器人', '具身智能', '人形机器人', '四足机器人',
@@ -90,17 +79,15 @@ function parseDate(dateStr) {
   return d.toISOString();
 }
 
-function matchKeywords(title, content, lang) {
+function matchKeywords(title, content) {
   const text = (title + ' ' + content).toLowerCase();
-  const keywords = lang === 'zh' ? KEYWORDS_ZH : KEYWORDS_EN;
-  return keywords.some(kw => text.includes(kw.toLowerCase()));
+  return KEYWORDS_ZH.some(kw => text.includes(kw.toLowerCase()));
 }
 
 // ===== RSS 解析 =====
-function parseRss(xml, sourceName, lang, maxItems) {
+function parseRss(xml, sourceName, maxItems) {
   const items = [];
 
-  // 匹配 <item> 或 <entry> 块
   const itemRegex = /<(?:item|entry)[\s\S]*?<\/(?:item|entry)>/gi;
   const matches = xml.match(itemRegex) || [];
 
@@ -124,8 +111,8 @@ function parseRss(xml, sourceName, lang, maxItems) {
       || block.match(/<published[^>]*>([\s\S]*?)<\/published>/i)?.[1]?.trim()
       || '';
 
-    // 内容摘要（截取前200字）
-    const summary = description.slice(0, 300);
+    // 快讯摘要截断到 100 字：全文 RSS 会把正文文章整段塞进来，快讯只保留一句话摘要
+    const summary = description.slice(0, 100) + (description.length > 100 ? '…' : '');
 
     items.push({
       title,
@@ -143,7 +130,7 @@ function parseRss(xml, sourceName, lang, maxItems) {
 async function fetchRss(source) {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
+    const timeout = setTimeout(() => controller.abort(), 20000);
 
     const res = await fetch(source.url, {
       signal: controller.signal,
@@ -161,14 +148,15 @@ async function fetchRss(source) {
     }
 
     const xml = await res.text();
-    const items = parseRss(xml, source.name, source.lang, source.maxItems);
+    const items = parseRss(xml, source.name, source.maxItems);
 
-    // 关键词过滤
     const filtered = items.filter(item =>
-      matchKeywords(item.title, item.content, source.lang)
+      // 标题必须含中文（防止 RSS 混入英文条目）且命中关键词
+      /[\u4e00-\u9fff]/.test(item.title) && matchKeywords(item.title, item.content)
     );
 
-    console.log(`  [${source.name}] 抓取 ${items.length} 条, 关键词过滤后 ${filtered.length} 条`);
+    const enCount = items.filter(i => !/[\u4e00-\u9fff]/.test(i.title)).length;
+    console.log(`  [${source.name}] 抓取 ${items.length} 条, 过滤英文 ${enCount} 条, 关键词过滤后 ${filtered.length} 条`);
     return filtered;
   } catch (e) {
     console.error(`  [${source.name}] 抓取失败: ${e.message}`);
@@ -214,14 +202,37 @@ async function pushToApi(items) {
 }
 
 // ===== 主流程 =====
+// 只推送最近 RECENT_DAYS 天内的条目（北京时间）；比“仅当日”更稳，
+// 避免凌晨或某个源当天没更新时快讯池只剩个位数
+function isWithinRecentDays(iso, days) {
+  const t = new Date(iso).getTime();
+  if (isNaN(t)) return false;
+  const cutoff = Date.now() + 8 * 3600 * 1000 - days * 24 * 3600 * 1000;
+  return t + 8 * 3600 * 1000 >= cutoff;
+}
+
+// 按标题去重（不同源可能转发同一条新闻）
+function dedupeByTitle(items) {
+  const seen = new Set();
+  const out = [];
+  for (const it of items) {
+    const key = it.title.replace(/\s+/g, '').toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(it);
+  }
+  return out;
+}
+
 async function main() {
   console.log('=====================================');
-  console.log('  快讯自动抓取');
+  console.log('  24小时快讯自动抓取');
   console.log('  ' + new Date().toLocaleString('zh-CN'));
   console.log('=====================================\n');
 
   console.log(`目标站点: ${SITE_URL}`);
-  console.log(`RSS源数量: ${RSS_SOURCES.length}\n`);
+  console.log(`RSS源数量: ${RSS_SOURCES.length}（仅中文源）`);
+  console.log(`时间窗口: 最近 ${RECENT_DAYS} 天　单次最多推送: ${MAX_PUSH} 条\n`);
 
   // 并行抓取所有源
   console.log('开始抓取...\n');
@@ -237,13 +248,15 @@ async function main() {
     }
   }
 
-  // 按时间排序
-  allItems.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+  // 时间窗口过滤 → 标题去重 → 按时间倒序
+  const recentItems = allItems.filter(item => isWithinRecentDays(item.published_at, RECENT_DAYS));
+  const uniqueItems = dedupeByTitle(recentItems);
+  uniqueItems.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
 
-  // 限制总数（每次最多推送50条）
-  const itemsToPush = allItems.slice(0, 50);
+  // 限制总数
+  const itemsToPush = uniqueItems.slice(0, MAX_PUSH);
 
-  console.log(`\n总计: ${allItems.length} 条快讯, 推送 ${itemsToPush.length} 条`);
+  console.log(`\n总计: ${allItems.length} 条, 窗口内 ${recentItems.length} 条, 去重后 ${uniqueItems.length} 条, 推送 ${itemsToPush.length} 条`);
 
   // 推送
   await pushToApi(itemsToPush);

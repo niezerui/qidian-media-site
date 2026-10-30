@@ -1,30 +1,29 @@
+import { query } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
-import { query, queryOne } from '@/lib/db';
 
-export async function GET(request: NextRequest) {
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const page = parseInt(searchParams.get('page') || '1', 10);
+  const limit = parseInt(searchParams.get('limit') || '20', 10);
+  const offset = (page - 1) * limit;
+
   try {
-    const { searchParams } = new URL(request.url);
-    const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
-    const pageSize = Math.min(50, Math.max(1, parseInt(searchParams.get('pageSize') || '20')));
-
-    const countRow = await queryOne('SELECT COUNT(*) as total FROM flash_news');
-    const total = countRow?.total ?? 0;
-
-    const offset = (page - 1) * pageSize;
     const flashes = await query(
       'SELECT * FROM flash_news ORDER BY published_at DESC LIMIT ? OFFSET ?',
-      [pageSize, offset]
+      [limit, offset]
     );
+    const [{ count }] = await query('SELECT COUNT(*) as count FROM flash_news') as any;
 
     return NextResponse.json({
-      success: true,
-      data: flashes,
-      total,
+      flashes,
+      total: count,
       page,
-      pageSize,
-      totalPages: Math.ceil(total / pageSize),
+      limit,
+      hasMore: offset + flashes.length < count,
     });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json({ flashes: [], total: 0, page, limit, hasMore: false }, { status: 500 });
   }
 }

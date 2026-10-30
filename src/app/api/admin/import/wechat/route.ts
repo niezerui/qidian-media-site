@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
       const contentToSave = safeContent + sourceNote;
 
       const result = await execute(
-        `INSERT INTO articles (title, slug, content, excerpt, cover_image, category_id, is_exclusive, status, publish_date, created_at, updated_at)
+        `INSERT INTO articles (title, slug, content, summary, cover_image, category_id, is_exclusive, status, published_at, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, 0, 'draft', datetime('now'), datetime('now'), datetime('now'))`,
         [article.title, slug, contentToSave, article.excerpt || '', article.coverImage || '', categoryId]
       );

@@ -88,7 +88,7 @@ export default function CommentSection({ articleId }: { articleId: number }) {
       </h2>
 
       {/* 评论表单 */}
-      <form onSubmit={handleSubmit} className="mb-8 p-4 rounded-xl" style={{ backgroundColor: 'var(--c-surface)' }}>
+      <form onSubmit={handleSubmit} className="mb-8 p-4" style={{ backgroundColor: 'var(--c-surface)' }}>
         {replyTo && (
           <div className="flex items-center justify-between mb-3 text-sm" style={{ color: 'var(--c-text-2)' }}>
             <span>回复 @{replyTo.name}</span>
@@ -102,7 +102,7 @@ export default function CommentSection({ articleId }: { articleId: number }) {
             value={authorName}
             onChange={e => setAuthorName(e.target.value)}
             maxLength={30}
-            className="flex-1 px-4 py-2.5 border rounded-lg text-sm focus:outline-none"
+            className="flex-1 px-4 py-2.5 border text-sm focus:outline-none"
             style={{ borderColor: 'var(--c-border)', backgroundColor: 'white' }}
             required
           />
@@ -113,7 +113,7 @@ export default function CommentSection({ articleId }: { articleId: number }) {
           onChange={e => setContent(e.target.value)}
           maxLength={2000}
           rows={3}
-          className="w-full px-4 py-3 border rounded-lg text-sm resize-none focus:outline-none mb-3"
+          className="w-full px-4 py-3 border text-sm resize-none focus:outline-none mb-3"
           style={{ borderColor: 'var(--c-border)', backgroundColor: 'white' }}
           required
         />
@@ -122,7 +122,7 @@ export default function CommentSection({ articleId }: { articleId: number }) {
           <button
             type="submit"
             disabled={submitting || !content.trim() || !authorName.trim()}
-            className="px-5 py-2 text-sm font-medium rounded-lg text-white transition-colors disabled:opacity-50"
+            className="px-5 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50"
             style={{ backgroundColor: submitting ? '#999' : 'var(--c-primary)' }}
           >
             {submitting ? '提交中...' : '发表评论'}

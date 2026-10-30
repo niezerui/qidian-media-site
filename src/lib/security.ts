@@ -15,7 +15,7 @@ export function sanitizeRichContent(html: string): string {
 
   return sanitizeHtml(html, {
     allowedTags: sanitizeHtml.defaults.allowedTags.concat([
-      'img', 'video', 'source', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+      'img', 'video', 'audio', 'source', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
       'figure', 'figcaption', 'iframe', 'pre', 'code', 'blockquote', 'table',
       'thead', 'tbody', 'tr', 'td', 'th', 'caption', 'colgroup', 'col',
       'section', 'span', 'br', 'hr', 'em', 'strong', 'u', 's', 'sub', 'sup',
@@ -25,7 +25,8 @@ export function sanitizeRichContent(html: string): string {
       ...sanitizeHtml.defaults.allowedAttributes,
       '*': ['style', 'class', 'id'],
       img: ['src', 'alt', 'width', 'height', 'loading', 'style', 'class', 'id', 'data-src', 'data-type', 'data-ratio', 'data-w', 'title'],
-      video: ['src', 'controls', 'width', 'height', 'poster', 'style', 'class'],
+      video: ['src', 'controls', 'playsinline', 'webkit-playsinline', 'preload', 'poster', 'muted', 'loop', 'width', 'height', 'style', 'class'],
+      audio: ['src', 'controls', 'preload', 'loop', 'style', 'class'],
       source: ['src', 'type'],
       iframe: ['src', 'width', 'height', 'frameborder', 'allowfullscreen', 'style'],
       a: ['href', 'target', 'rel', 'style', 'class'],
@@ -41,6 +42,7 @@ export function sanitizeRichContent(html: string): string {
     allowedSchemesByTag: {
       img: ['http', 'https', 'data'],
       video: ['http', 'https'],
+      audio: ['http', 'https'],
       source: ['http', 'https'],
     },
     allowedIframeHostnames: ['www.youtube.com', 'player.bilibili.com', 'v.qq.com'],

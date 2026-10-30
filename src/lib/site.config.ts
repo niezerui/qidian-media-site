@@ -21,7 +21,9 @@ export const siteConfig = {
   // ---- 配色（改hex值立即生效） ----
   colors: {
     primary: '#121212',
-    accent: '#f4d933',
+    accent: '#d4af37',
+    accentBright: '#f4d933',
+    accentDark: '#b8941f',
     background: '#ffffff',
     surface: '#f8f8f8',
     border: '#e4e4e4',
@@ -30,6 +32,13 @@ export const siteConfig = {
     textMuted: '#9a9a9a',
     footer: '#0d0d0d',
   },
+
+  // ---- 顶部二维码入口（悬停滑出二维码；替换 public/images/ 下对应图片即可换码）----
+  topLinks: [
+    { label: '公众号', qr: '/images/qrcode-gzh.png', caption: '扫码关注公众号' },
+    { label: '视频号', qr: '/images/qrcode-sph.png', caption: '扫码关注视频号' },
+    { label: '联系我们', qr: '/images/qrcode-contact.png', caption: '合作 · 投稿 · 交流', href: '/contact' },
+  ],
 
   // ---- 联系方式 ----
   contact: {
@@ -64,6 +73,7 @@ export const siteConfig = {
     { label: '关于奇点', href: '/about' },
     { label: '加入我们', href: '/join' },
     { label: '广告合作', href: '/advertise' },
+    { label: 'RSS 订阅', href: '/feed.xml' },
   ],
 
   // ---- SEO ----

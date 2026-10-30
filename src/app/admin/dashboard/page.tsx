@@ -6,7 +6,16 @@ import RichEditor from '@/components/RichEditor';
 import CommentManager from '@/components/admin/CommentManager';
 import UserManager from '@/components/admin/UserManager';
 
-interface Category { id: number; slug: string; name: string; }
+interface Category { id: number; slug: string; name: string; sort_order?: number | null; article_count?: number; }
+
+// 通知其它标签页（前台导航）刷新分类；BroadcastChannel 不可用时静默忽略
+function notifyNavChanged() {
+  try {
+    const bc = new BroadcastChannel('qidian-nav');
+    bc.postMessage({ type: 'nav-updated', at: Date.now() });
+    bc.close();
+  } catch { /* 忽略 */ }
+}
 
 function EyeIcon({ open }: { open: boolean }) {
   return open ? (
@@ -24,10 +33,15 @@ function EyeIcon({ open }: { open: boolean }) {
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'articles' | 'flashes' | 'comments' | 'users' | 'settings'>('articles');
+  const [activeTab, setActiveTab] = useState<'articles' | 'categories' | 'flashes' | 'comments' | 'users' | 'settings'>('articles');
   const [articles, setArticles] = useState<any[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft'>('all');
-  const filteredArticles = articles.filter(a => statusFilter === 'all' ? true : a.status === statusFilter || (statusFilter === 'published' && !a.status));
+  // 分页与统计（服务端驱动）
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [counts, setCounts] = useState({ total: 0, published: 0, draft: 0, featured: 0, banner: 0 });
+  const PAGE_SIZE = 20;
   const [flashes, setFlashes] = useState<any[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -121,21 +135,58 @@ export default function AdminDashboardPage() {
     finally { setWechatConfigSaving(false); }
   };
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (targetPage = 1, status: 'all' | 'published' | 'draft' = 'all') => {
     try {
       setLoading(true);
+      const qs = `page=${targetPage}&pageSize=20${status !== 'all' ? `&status=${status}` : ''}`;
       const [aRes, fRes, cRes] = await Promise.all([
-        fetch('/api/admin/articles'), fetch('/api/admin/flashes'), fetch('/api/admin/categories')
+        fetch(`/api/admin/articles?${qs}`), fetch('/api/admin/flashes'), fetch('/api/admin/categories')
       ]);
       if (aRes.status === 401) { router.push('/admin/login'); return; }
-      const aD = await aRes.json(); if (aD.success) setArticles(aD.data);
+      const aD = await aRes.json();
+      if (aD.success) {
+        setArticles(aD.data);
+        setTotal(aD.total || 0);
+        setTotalPages(Math.max(1, aD.totalPages || 1));
+        if (aD.counts) setCounts(aD.counts);
+        // 当前页超出总页数时（如删光本页末条）回退到最后一页
+        if (aD.totalPages && targetPage > aD.totalPages && aD.totalPages >= 1 && aD.data.length === 0) {
+          setPage(Math.max(1, aD.totalPages));
+          return fetchData(Math.max(1, aD.totalPages), status);
+        }
+      }
       const fD = await fRes.json(); if (fD.success) setFlashes(fD.data);
       const cD = await cRes.json(); if (cD.success) setCategories(cD.data);
     } catch { setError('加载数据失败'); }
     finally { setLoading(false); }
   }, [router]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // 重新加载当前页
+  const reloadArticles = useCallback(() => {
+    fetchData(page, statusFilter);
+  }, [fetchData, page, statusFilter]);
+
+  useEffect(() => { fetchData(1, 'all'); }, [fetchData]);
+
+  // 切换状态筛选（回到第 1 页）
+  const changeStatusFilter = (s: 'all' | 'published' | 'draft') => {
+    setStatusFilter(s);
+    setPage(1);
+    fetchData(1, s);
+  };
+
+  const goPage = (p: number) => {
+    if (p < 1 || p > totalPages || p === page) return;
+    setPage(p);
+    fetchData(p, statusFilter);
+  };
+
+  // 页码窗口：始终含首页/末页，最多展示当前页前后共 7 个数字，中间用省略号
+  const pageNumbers = (() => {
+    const s = new Set<number>([1, totalPages]);
+    for (let i = Math.max(1, page - 2); i <= Math.min(totalPages, page + 2); i++) s.add(i);
+    return Array.from(s).sort((a, b) => a - b);
+  })();
 
   // 打开设置页时加载公众号配置
   useEffect(() => {
@@ -153,6 +204,68 @@ export default function AdminDashboardPage() {
   }, [activeTab]);
 
   // ========== Category ==========
+  const [catEditing, setCatEditing] = useState<{ id: number; name: string } | null>(null);
+  const [catSaving, setCatSaving] = useState(false);
+  const [newCatNameTab, setNewCatNameTab] = useState('');
+  // 导航顺序：本地草稿 vs 已保存（不一致时提示保存）
+  const [catOrder, setCatOrder] = useState<number[]>([]);
+  const [savedOrder, setSavedOrder] = useState<number[]>([]);
+  // 删除确认（分类下有文章时需选择转移目标）
+  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
+  const [moveTo, setMoveTo] = useState('');
+
+  // 分类集合变化（新增/删除/重新拉取）时同步顺序草稿；仅顺序被本地调整时保留用户排列
+  useEffect(() => {
+    const ids = categories.map(c => c.id);
+    const sameSet = ids.length > 0 && ids.length === catOrder.length &&
+      [...ids].sort((a, b) => a - b).join(',') === [...catOrder].sort((a, b) => a - b).join(',');
+    if (sameSet) return;
+    setCatOrder(ids);
+    setSavedOrder(ids);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories]);
+
+  const orderDirty = catOrder.length > 0 && catOrder.join(',') !== savedOrder.join(',');
+
+  // 上移 / 下移
+  const moveCat = (idx: number, dir: -1 | 1) => {
+    setCatOrder(prev => {
+      const j = idx + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[j]] = [next[j], next[idx]];
+      return next;
+    });
+  };
+
+  // 保存导航顺序（确认后立即写入数据库并推送前台）
+  const handleSaveOrder = async () => {
+    if (!orderDirty) return;
+    setCatSaving(true);
+    try {
+      const res = await fetch('/api/admin/categories', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: catOrder }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSavedOrder(catOrder);
+        // 本地同步 categories 顺序，保证文章表单等处的分类下拉一致
+        setCategories(prev => {
+          const map = new Map(prev.map(c => [c.id, c]));
+          return catOrder.map(id => map.get(id)).filter(Boolean) as Category[];
+        });
+        notifyNavChanged();
+        setSuccess('导航顺序已保存，前台已同步更新');
+        setTimeout(() => setSuccess(''), 2500);
+      } else {
+        setError(data.error || '保存顺序失败');
+      }
+    } catch { setError('网络错误'); }
+    finally { setCatSaving(false); }
+  };
+
   const handleAddCategory = async () => {
     if (!newCatName.trim()) return;
     try {
@@ -167,12 +280,101 @@ export default function AdminDashboardPage() {
         setArticleForm(f => ({ ...f, category_id: String(data.data.id) }));
         setNewCatName('');
         setShowCatAdd(false);
+        notifyNavChanged();
         setSuccess('分类已添加');
         setTimeout(() => setSuccess(''), 2000);
       } else {
         setError(data.error || '添加失败');
       }
     } catch { setError('网络错误'); }
+  };
+
+  // 分类管理页签：新增（不联动文章表单）
+  const handleAddCategoryTab = async () => {
+    if (!newCatNameTab.trim()) return;
+    setCatSaving(true);
+    try {
+      const res = await fetch('/api/admin/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newCatNameTab.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCategories(prev => [...prev, data.data]);
+        setNewCatNameTab('');
+        notifyNavChanged();
+        setSuccess('分类已添加，前台导航栏已同步展示');
+        setTimeout(() => setSuccess(''), 2500);
+      } else {
+        setError(data.error || '添加失败');
+      }
+    } catch { setError('网络错误'); }
+    finally { setCatSaving(false); }
+  };
+
+  // 分类管理页签：重命名
+  const handleRenameCategory = async () => {
+    if (!catEditing || !catEditing.name.trim()) return;
+    setCatSaving(true);
+    try {
+      const res = await fetch('/api/admin/categories', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: catEditing.id, name: catEditing.name.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const newName = catEditing.name.trim();
+        setCategories(prev => prev.map(c => c.id === catEditing.id ? { ...c, name: newName } : c));
+        setCatEditing(null);
+        notifyNavChanged();
+        setSuccess('分类已更新，前台导航栏已同步显示新名称');
+        setTimeout(() => setSuccess(''), 2500);
+      } else {
+        setError(data.error || '修改失败');
+      }
+    } catch { setError('网络错误'); }
+    finally { setCatSaving(false); }
+  };
+
+  // 分类管理页签：点击删除 → 打开确认弹窗（有文章时需选转移目标）
+  const handleDeleteCategory = (cat: Category) => {
+    if (categories.length <= 1) {
+      setError('至少要保留一个分类，无法删除最后一个分类');
+      setTimeout(() => setError(''), 2500);
+      return;
+    }
+    setMoveTo('');
+    setDeleteTarget(cat);
+  };
+
+  // 分类管理页签：确认删除
+  const confirmDeleteCategory = async () => {
+    if (!deleteTarget) return;
+    const count = deleteTarget.article_count ?? 0;
+    if (count > 0 && !moveTo) {
+      setError('请选择文章要转移到的分类');
+      return;
+    }
+    setCatSaving(true);
+    try {
+      const qs = count > 0 ? `?id=${deleteTarget.id}&moveTo=${moveTo}` : `?id=${deleteTarget.id}`;
+      const res = await fetch(`/api/admin/categories${qs}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setCategories(prev => prev.filter(c => c.id !== deleteTarget.id));
+        notifyNavChanged();
+        setSuccess(data.message || '分类已删除');
+        setTimeout(() => setSuccess(''), 3000);
+        setDeleteTarget(null);
+        // 重新拉取，保证文章列表/分类下拉与数据库一致
+        fetchData(page, statusFilter);
+      } else {
+        setError(data.error || '删除失败');
+      }
+    } catch { setError('网络错误'); }
+    finally { setCatSaving(false); }
   };
 
   // ========== Article CRUD ==========
@@ -187,12 +389,31 @@ export default function AdminDashboardPage() {
     };
     if (editingArticle) body.id = editingArticle.id;
 
-    const res = await fetch('/api/admin/articles', {
-      method, headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (data.success) { resetArticleForm(); fetchData(); setSuccess(status === 'draft' ? '草稿已保存' : editingArticle ? '修改成功' : '发布成功'); setTimeout(() => setSuccess(''), 2000); }
+    const payload = JSON.stringify(body);
+    // 前端体积预检：服务器（Vercel）单次请求体上限约 4.5MB，提前给出可操作提示
+    if (payload.length > 3_900_000) {
+      setError('内容过大：内嵌图片较多，保存体积接近服务器上限（4.5MB）。建议删除部分大图，或删除后重新上传（超过 2.5MB 的图片/视频会自动存到对象存储，不占用正文体积）再保存。');
+      return;
+    }
+
+    let res: Response;
+    try {
+      res = await fetch('/api/admin/articles', {
+        method, headers: { 'Content-Type': 'application/json' },
+        body: payload,
+      });
+    } catch {
+      setError('网络错误，请重试');
+      return;
+    }
+
+    let data: any = null;
+    try { data = await res.json(); } catch { /* 413/网关错误等非 JSON 响应 */ }
+    if (!data) {
+      setError(res.status === 413 ? '内容过大：服务器拒绝了本次保存（超过 4.5MB 上限）。请压缩图片后重试。' : `服务器异常（HTTP ${res.status}），请稍后重试`);
+      return;
+    }
+    if (data.success) { resetArticleForm(); reloadArticles(); setSuccess(status === 'draft' ? '草稿已保存' : editingArticle ? '修改成功' : '发布成功'); setTimeout(() => setSuccess(''), 2000); }
     else { setError(data.error || '操作失败'); }
   };
 
@@ -205,10 +426,11 @@ export default function AdminDashboardPage() {
     try { await saveArticle('draft'); } catch { setError('网络错误'); }
   };
 
-  const handleEditArticle = (article: any) => {
+  // 编辑：列表已不含 content 大字段，先按 id 拉取完整文章再填入表单
+  const handleEditArticle = async (article: any) => {
     setEditingArticle(article);
     setArticleForm({
-      title: article.title || '', summary: article.summary || '', content: article.content || '',
+      title: article.title || '', summary: article.summary || '', content: '',
       category_id: String(article.category_id || ''), author: article.author || '奇点编辑部',
       tags: (article.tags || []).join(', '), cover_image: article.cover_image || '',
       is_featured: article.is_featured || false, is_exclusive: article.is_exclusive || false,
@@ -216,6 +438,23 @@ export default function AdminDashboardPage() {
       published_at: article.published_at || '',
     });
     setShowArticleForm(true);
+    try {
+      const res = await fetch(`/api/admin/articles?id=${article.id}`);
+      let data: any = null;
+      try { data = await res.json(); } catch { /* ignore */ }
+      if (res.ok && data?.success && data.data) {
+        const a = data.data;
+        setArticleForm(f => ({
+          ...f,
+          title: a.title || f.title,
+          summary: a.summary || '',
+          content: a.content || '',
+          cover_image: a.cover_image || '',
+        }));
+      } else {
+        setError('正文加载失败，请重试');
+      }
+    } catch { setError('正文加载失败，请重试'); }
   };
 
   const resetArticleForm = () => {
@@ -227,11 +466,11 @@ export default function AdminDashboardPage() {
   const handleDeleteArticle = async (id: number) => {
     if (!confirm('确定删除这篇文章？')) return;
     await fetch(`/api/admin/articles?id=${id}`, { method: 'DELETE' });
-    fetchData();
+    reloadArticles();
   };
 
   const handleToggleBanner = async (article: any) => {
-    const currentBannerCount = articles.filter(a => a.is_banner && a.id !== article.id).length;
+    const currentBannerCount = (counts?.banner ?? 0) - (article.is_banner ? 1 : 0);
     if (!article.is_banner && currentBannerCount >= 5) {
       showToast('Banner 最多设置 5 个，请先取消其他文章的 Banner', 'warning');
       return;
@@ -245,7 +484,32 @@ export default function AdminDashboardPage() {
       const data = await res.json();
       if (data.success) {
         showToast(article.is_banner ? '已取消 Banner' : '已设为 Banner');
-        fetchData();
+        reloadArticles();
+      } else {
+        showToast(data.error || '操作失败', 'error');
+      }
+    } catch {
+      showToast('网络错误', 'error');
+    }
+  };
+
+  const handleToggleFeatured = async (article: any) => {
+    // 精选只在 Banner 右侧展示 3 个，这里限制最多 4 个避免溢出
+    const currentFeaturedCount = (counts?.featured ?? 0) - (article.is_featured ? 1 : 0);
+    if (!article.is_featured && currentFeaturedCount >= 4) {
+      showToast('精选最多设置 4 个（首页右侧展示前 3 个），请先取消其他文章的精选', 'warning');
+      return;
+    }
+    try {
+      const res = await fetch('/api/admin/articles', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: article.id, is_featured: !article.is_featured }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(article.is_featured ? '已取消精选' : '已设为精选');
+        reloadArticles();
       } else {
         showToast(data.error || '操作失败', 'error');
       }
@@ -280,7 +544,7 @@ export default function AdminDashboardPage() {
         setImportUrl('');
         setImportHtml('');
         setShowImportPanel(false);
-        fetchData();
+        reloadArticles();
       } else {
         setError(data.error || '导入失败');
       }
@@ -319,7 +583,7 @@ export default function AdminDashboardPage() {
       if (data.success) {
         setSuccess(`导入成功：${data.data.title}`);
         setTimeout(() => setSuccess(''), 3000);
-        fetchData();
+        reloadArticles();
         fetchWechatArticles(); // 重新拉取（可能需要从公众号列表移除）
       } else {
         setError(data.error);
@@ -349,7 +613,7 @@ export default function AdminDashboardPage() {
     setSelectedArticles(new Set());
     setSuccess(`批量导入完成：成功 ${count}/${selectedArticles.size} 篇`);
     setTimeout(() => setSuccess(''), 4000);
-    fetchData();
+    reloadArticles();
     fetchWechatArticles();
     setImporting(false);
   };
@@ -376,7 +640,7 @@ export default function AdminDashboardPage() {
     try {
       const res = await fetch('/api/admin/flashes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(flashForm) });
       const data = await res.json();
-      if (data.success) { setFlashForm({ title: '', content: '', date_label: '' }); setShowFlashForm(false); fetchData(); setSuccess('快讯发布成功'); setTimeout(() => setSuccess(''), 2000); }
+      if (data.success) { setFlashForm({ title: '', content: '', date_label: '' }); setShowFlashForm(false); reloadArticles(); setSuccess('快讯发布成功'); setTimeout(() => setSuccess(''), 2000); }
       else setError(data.error || '操作失败');
     } catch { setError('网络错误'); }
   };
@@ -384,7 +648,7 @@ export default function AdminDashboardPage() {
   const handleDeleteFlash = async (id: number) => {
     if (!confirm('确定删除？')) return;
     await fetch(`/api/admin/flashes?id=${id}`, { method: 'DELETE' });
-    fetchData();
+    reloadArticles();
   };
 
   const handleBatchDeleteFlash = async () => {
@@ -395,7 +659,7 @@ export default function AdminDashboardPage() {
       await fetch(`/api/admin/flashes?id=${id}`, { method: 'DELETE' });
     }
     setFlashSelected(new Set());
-    fetchData();
+    reloadArticles();
     showToast(`已删除 ${ids.length} 条快讯`);
   };
 
@@ -473,17 +737,232 @@ export default function AdminDashboardPage() {
 
         <div className="flex items-center gap-1 mb-8 bg-white rounded-lg border border-brand-100 p-1 w-fit">
           <button onClick={() => setActiveTab('articles')} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'articles' ? 'bg-brand-900 text-white' : 'text-brand-500 hover:text-brand-900'}`}>文章管理</button>
+          <button onClick={() => setActiveTab('categories')} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'categories' ? 'bg-brand-900 text-white' : 'text-brand-500 hover:text-brand-900'}`}>🗂 分类管理</button>
           <button onClick={() => setActiveTab('flashes')} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'flashes' ? 'bg-brand-900 text-white' : 'text-brand-500 hover:text-brand-900'}`}>快讯管理</button>
           <button onClick={() => setActiveTab('comments')} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'comments' ? 'bg-brand-900 text-white' : 'text-brand-500 hover:text-brand-900'}`}>💬 评论管理</button>
           <button onClick={() => setActiveTab('users')} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'users' ? 'bg-brand-900 text-white' : 'text-brand-500 hover:text-brand-900'}`}>👥 用户管理</button>
           <button onClick={() => setActiveTab('settings')} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'settings' ? 'bg-brand-900 text-white' : 'text-brand-500 hover:text-brand-900'}`}>⚙ 设置</button>
         </div>
 
+        {/* ========== CATEGORIES ========== */}
+        {activeTab === 'categories' && (
+          <div className="bg-white border border-brand-100 rounded-xl p-6 shadow-sm max-w-2xl">
+            <h2 className="text-lg font-bold text-brand-900 mb-1">分类管理（网站导航）</h2>
+            <p className="text-xs text-brand-400 mb-5">
+              新增 / 重命名 / 调整顺序都会同步到前台导航栏和页脚；删除有文章的分类时，需要先选择文章要转移到的分类，确保不会有文章失去归属。
+            </p>
+
+            {/* 新增 */}
+            <div className="flex gap-2 mb-6">
+              <input
+                type="text"
+                value={newCatNameTab}
+                onChange={e => setNewCatNameTab(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleAddCategoryTab(); }}
+                placeholder="输入新分类名称（最多20字）"
+                maxLength={20}
+                className="flex-1 px-4 py-2.5 border border-brand-200 rounded-lg text-sm focus:outline-none focus:border-brand-900"
+              />
+              <button
+                onClick={handleAddCategoryTab}
+                disabled={catSaving || !newCatNameTab.trim()}
+                className="px-5 py-2.5 bg-brand-900 text-white text-sm font-medium rounded-lg hover:bg-brand-800 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                + 新增分类
+              </button>
+            </div>
+
+            {/* 排序提示 */}
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <span className="text-xs text-brand-400">
+                共 {categories.length} 个分类 · 用 ↑↓ 调整前台导航的显示顺序
+              </span>
+              {orderDirty && <span className="text-xs font-medium text-amber-600">顺序已改动，记得保存</span>}
+            </div>
+
+            {/* 分类列表（按当前草稿顺序展示） */}
+            <div className="border border-brand-100 rounded-lg divide-y divide-brand-50">
+              {categories.length === 0 && (
+                <p className="px-4 py-6 text-sm text-brand-400 text-center">暂无分类</p>
+              )}
+              {catOrder.map((cid, idx) => {
+                const cat = categories.find(c => c.id === cid);
+                if (!cat) return null;
+                const cnt = cat.article_count ?? 0;
+                return (
+                  <div key={cat.id} className="flex items-center gap-2 px-3 py-3">
+                    {/* 序号 */}
+                    <span className="w-5 shrink-0 text-center text-xs text-brand-300" style={{ fontFamily: 'var(--font-mono, monospace)' }}>
+                      {idx + 1}
+                    </span>
+                    {/* 上移 / 下移 */}
+                    <div className="shrink-0 flex flex-col">
+                      <button
+                        type="button"
+                        onClick={() => moveCat(idx, -1)}
+                        disabled={idx === 0}
+                        aria-label={`将「${cat.name}」上移`}
+                        title="上移"
+                        className="w-6 h-[18px] flex items-center justify-center border border-brand-200 rounded-t text-brand-500 hover:border-brand-900 hover:text-brand-900 hover:bg-brand-50 transition-colors disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveCat(idx, 1)}
+                        disabled={idx === catOrder.length - 1}
+                        aria-label={`将「${cat.name}」下移`}
+                        title="下移"
+                        className="w-6 h-[18px] flex items-center justify-center border border-t-0 border-brand-200 rounded-b text-brand-500 hover:border-brand-900 hover:text-brand-900 hover:bg-brand-50 transition-colors disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                      </button>
+                    </div>
+
+                    {catEditing?.id === cat.id ? (
+                      <>
+                        <input
+                          autoFocus
+                          type="text"
+                          value={catEditing.name}
+                          maxLength={20}
+                          onChange={e => setCatEditing({ ...catEditing, name: e.target.value })}
+                          onKeyDown={e => { if (e.key === 'Enter') handleRenameCategory(); }}
+                          className="flex-1 px-3 py-1.5 border border-brand-200 rounded-lg text-sm focus:outline-none focus:border-brand-900"
+                        />
+                        <button
+                          onClick={handleRenameCategory}
+                          disabled={catSaving || !catEditing.name.trim()}
+                          className="px-3 py-1.5 bg-brand-900 text-white text-xs rounded-lg hover:bg-brand-800 disabled:opacity-40 whitespace-nowrap"
+                        >
+                          保存
+                        </button>
+                        <button
+                          onClick={() => setCatEditing(null)}
+                          className="px-3 py-1.5 border border-brand-200 text-brand-500 text-xs rounded-lg hover:bg-brand-50 whitespace-nowrap"
+                        >
+                          取消
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-sm text-brand-900 font-medium truncate">{cat.name}</span>
+                        <span
+                          className="shrink-0 text-[11px] px-1.5 py-0.5 rounded"
+                          style={{ backgroundColor: cnt > 0 ? '#fff7ed' : '#f8fafc', color: cnt > 0 ? '#c2410c' : '#94a3b8' }}
+                          title={cnt > 0 ? '该分类下有文章，删除时需选择转移目标' : '该分类下暂无文章'}
+                        >
+                          {cnt} 篇
+                        </span>
+                        <span className="flex-1" />
+                        <span className="hidden sm:inline text-xs text-brand-300" style={{ fontFamily: 'var(--font-mono, monospace)' }}>{cat.slug}</span>
+                        <button
+                          onClick={() => setCatEditing({ id: cat.id, name: cat.name })}
+                          className="px-3 py-1.5 border border-brand-200 text-brand-600 text-xs rounded-lg hover:border-brand-900 hover:text-brand-900 transition-colors whitespace-nowrap"
+                        >
+                          ✏️ 重命名
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCategory(cat)}
+                          disabled={catSaving}
+                          className="px-3 py-1.5 border border-red-100 text-red-400 text-xs rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors whitespace-nowrap disabled:opacity-40"
+                        >
+                          🗑 删除
+                        </button>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 保存顺序 */}
+            <div className="flex items-center gap-3 mt-4">
+              <button
+                onClick={handleSaveOrder}
+                disabled={!orderDirty || catSaving}
+                className="px-5 py-2.5 bg-brand-900 text-white text-sm font-medium rounded-lg hover:bg-brand-800 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                {catSaving ? '保存中…' : '保存导航顺序'}
+              </button>
+              {orderDirty ? (
+                <button
+                  onClick={() => setCatOrder(savedOrder)}
+                  disabled={catSaving}
+                  className="px-4 py-2.5 border border-brand-200 text-brand-600 text-sm rounded-lg hover:bg-brand-50 disabled:opacity-40 whitespace-nowrap"
+                >
+                  撤销改动
+                </button>
+              ) : (
+                <span className="text-xs text-brand-400">当前顺序与线上一致</span>
+              )}
+            </div>
+
+            {/* ===== 删除确认弹窗（含文章转移） ===== */}
+            {deleteTarget && (
+              <div
+                className="fixed inset-0 z-[100] flex items-center justify-center px-4"
+                style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
+                onClick={() => { if (!catSaving) setDeleteTarget(null); }}
+              >
+                <div
+                  className="w-full max-w-md bg-white rounded-xl shadow-2xl p-6"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <h3 className="text-base font-bold text-brand-900 mb-2">
+                    删除分类「{deleteTarget.name}」
+                  </h3>
+
+                  {(deleteTarget.article_count ?? 0) > 0 ? (
+                    <>
+                      <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+                        该分类下有 <b>{deleteTarget.article_count}</b> 篇文章。删除后这些文章会失去归属，请选择要转移到的分类：
+                      </div>
+                      <label className="block text-xs text-brand-500 mb-1.5">转移到</label>
+                      <select
+                        value={moveTo}
+                        onChange={e => setMoveTo(e.target.value)}
+                        className="w-full px-4 py-2.5 border border-brand-200 rounded-lg text-sm focus:outline-none focus:border-brand-900 mb-5"
+                      >
+                        <option value="">请选择目标分类…</option>
+                        {categories.filter(c => c.id !== deleteTarget.id).map(c => (
+                          <option key={c.id} value={c.id}>{c.name}（现有 {c.article_count ?? 0} 篇）</option>
+                        ))}
+                      </select>
+                    </>
+                  ) : (
+                    <p className="mb-5 text-sm text-brand-500">
+                      该分类下暂无文章，删除后不影响任何内容。
+                    </p>
+                  )}
+
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => setDeleteTarget(null)}
+                      disabled={catSaving}
+                      className="px-4 py-2.5 border border-brand-200 text-brand-600 text-sm rounded-lg hover:bg-brand-50 disabled:opacity-40"
+                    >
+                      取消
+                    </button>
+                    <button
+                      onClick={confirmDeleteCategory}
+                      disabled={catSaving || ((deleteTarget.article_count ?? 0) > 0 && !moveTo)}
+                      className="px-4 py-2.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {catSaving ? '处理中…' : ((deleteTarget.article_count ?? 0) > 0 ? '转移并删除' : '确认删除')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ========== ARTICLES ========== */}
         {activeTab === 'articles' && (
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-brand-900">文章列表 ({articles.length})</h2>
+              <h2 className="text-lg font-bold text-brand-900">文章列表 <span className="text-sm font-normal text-brand-400">(共 {total} 篇{totalPages > 1 ? ` · 第 ${page}/${totalPages} 页` : ''})</span></h2>
               <div className="flex items-center gap-3">
                 <button onClick={() => { setShowImportPanel(!showImportPanel); setShowArticleForm(false); }} className="px-4 py-2 border-2 border-green-500 text-green-600 text-sm font-medium rounded-lg hover:bg-green-50 transition-colors">
                   📥 导入公众号文章
@@ -492,25 +971,25 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            {/* 状态筛选 */}
+            {/* 状态筛选（服务端过滤，跨页准确） */}
             <div className="flex items-center gap-2 mb-4">
               <button
-                onClick={() => setStatusFilter('all')}
+                onClick={() => changeStatusFilter('all')}
                 className={`px-4 py-1.5 text-xs font-medium rounded-full transition-colors ${statusFilter === 'all' ? 'bg-brand-900 text-white' : 'text-brand-500 hover:text-brand-900 bg-white border border-brand-200'}`}
               >
-                全部 ({articles.length})
+                全部 ({counts.total})
               </button>
               <button
-                onClick={() => setStatusFilter('published')}
+                onClick={() => changeStatusFilter('published')}
                 className={`px-4 py-1.5 text-xs font-medium rounded-full transition-colors ${statusFilter === 'published' ? 'bg-green-600 text-white' : 'text-green-600 hover:text-green-700 bg-white border border-green-200'}`}
               >
-                已发布 ({articles.filter(a => a.status === 'published' || !a.status).length})
+                已发布 ({counts.published})
               </button>
               <button
-                onClick={() => setStatusFilter('draft')}
+                onClick={() => changeStatusFilter('draft')}
                 className={`px-4 py-1.5 text-xs font-medium rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'draft' ? 'bg-amber-500 text-white' : 'text-amber-600 hover:text-amber-700 bg-white border border-amber-200'}`}
               >
-                📝 草稿箱 ({articles.filter(a => a.status === 'draft').length})
+                📝 草稿箱 ({counts.draft})
               </button>
             </div>
 
@@ -830,10 +1309,12 @@ export default function AdminDashboardPage() {
                     />
                   </div>
 
-                  <div className="flex items-center gap-3 pt-2">
+                  {/* 操作栏：悬浮置底，长文编辑时随时可发布/存草稿，无需滚到底部 */}
+                  <div className="sticky bottom-0 z-30 flex items-center gap-3 -mx-6 -mb-6 px-6 py-3 bg-white/95 backdrop-blur border-t border-brand-100 rounded-b-xl shadow-[0_-2px_12px_rgba(0,0,0,0.06)]">
                     <button type="submit" className="px-6 py-2.5 bg-brand-900 text-white text-sm font-medium rounded-lg hover:bg-brand-800">{editingArticle ? '保存修改' : '发布文章'}</button>
                     <button type="button" onClick={handleSaveDraft} className="px-6 py-2.5 border-2 border-brand-200 text-brand-600 text-sm font-medium rounded-lg hover:border-brand-900 hover:text-brand-900 transition-colors">💾 保存草稿</button>
                     <button type="button" onClick={resetArticleForm} className="px-5 py-2.5 border border-brand-200 text-brand-600 text-sm rounded-lg hover:bg-brand-50">取消</button>
+                    <span className="ml-auto text-xs text-brand-400 hidden sm:inline">✎ 正文 {articleForm.content.replace(/<[^>]+>/g, '').length} 字</span>
                   </div>
                 </form>
               </div>
@@ -856,11 +1337,23 @@ export default function AdminDashboardPage() {
                       </tr>
                     </thead>
                   <tbody className="divide-y divide-brand-50">
-                    {filteredArticles.map(a => (
+                    {articles.map(a => (
                       <tr key={a.id} className="hover:bg-brand-50/50">
                         <td className="px-4 py-3 text-brand-900 font-medium max-w-[300px] truncate">{a.title}</td>
                         <td className="px-4 py-3 text-brand-500">{a.category_name}</td>
-                        <td className="px-4 py-3 text-center">{a.is_featured ? <span className="text-xs px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full font-medium">精选</span> : <span className="text-brand-300">-</span>}</td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => handleToggleFeatured(a)}
+                            title={a.is_featured ? '点击取消精选' : '点击设为精选（首页Banner右侧展示）'}
+                            className={`text-xs px-2 py-0.5 rounded-full font-medium transition-colors ${
+                              a.is_featured
+                                ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                                : 'bg-brand-50 text-brand-300 hover:bg-amber-50 hover:text-amber-500'
+                            }`}
+                          >
+                            {a.is_featured ? '⭐ 精选' : '＋精选'}
+                          </button>
+                        </td>
                         <td className="px-4 py-3 text-center">
                           <button
                             onClick={() => handleToggleBanner(a)}
@@ -883,10 +1376,52 @@ export default function AdminDashboardPage() {
                         </td>
                       </tr>
                     ))}
-                    {filteredArticles.length === 0 && <tr><td colSpan={8} className="px-4 py-12 text-center text-brand-400">{statusFilter === 'draft' ? '草稿箱为空' : '暂无文章'}</td></tr>}
+                    {articles.length === 0 && <tr><td colSpan={8} className="px-4 py-12 text-center text-brand-400">{statusFilter === 'draft' ? '草稿箱为空' : '暂无文章'}</td></tr>}
                   </tbody>
                 </table>
               </div>
+
+              {/* 分页条：每页 20 条 */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-brand-50 bg-brand-50/30">
+                  <span className="text-xs text-brand-400">
+                    共 {total} 篇 · 每页 {PAGE_SIZE} 条 · 第 {page}/{totalPages} 页
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => goPage(page - 1)}
+                      disabled={page <= 1}
+                      className="px-3 py-1.5 text-xs font-medium rounded-lg border border-brand-200 bg-white text-brand-600 hover:bg-brand-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      ‹ 上一页
+                    </button>
+                    {pageNumbers.map((p, idx) => (
+                      <span key={p} className="flex items-center gap-1">
+                        {idx > 0 && p - pageNumbers[idx - 1] > 1 && (
+                          <span className="px-1 text-brand-400 select-none">…</span>
+                        )}
+                        <button
+                          onClick={() => goPage(p)}
+                          className={`w-8 h-8 text-xs font-medium rounded-lg transition-colors ${
+                            p === page
+                              ? 'bg-brand-900 text-white'
+                              : 'border border-brand-200 bg-white text-brand-600 hover:bg-brand-100'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      </span>
+                    ))}
+                    <button
+                      onClick={() => goPage(page + 1)}
+                      disabled={page >= totalPages}
+                      className="px-3 py-1.5 text-xs font-medium rounded-lg border border-brand-200 bg-white text-brand-600 hover:bg-brand-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      下一页 ›
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

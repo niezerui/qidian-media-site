@@ -8,6 +8,9 @@ const OWN_DOMAINS = [
   'qidianyanjiushe.com',
   'localhost',
   '127.0.0.1',
+  // 站内对象存储（Vercel Blob）：公开可访问，无需代理
+  'public.blob.vercel-storage.com',
+  'blob.vercel-storage.com',
 ];
 
 // 明确需要代理的外链图片域名（防盗链严格）
@@ -85,8 +88,28 @@ export function proxyImageUrl(url: string): string {
 }
 
 /**
+ * 正文图片统一排版样式：块级 + 水平居中（与两端对齐的文本列对齐）
+ * 在 sanitize 之后执行，注入的内联样式不会被过滤
+ */
+const IMG_JUSTIFY_STYLE = 'display:block;margin-left:auto;margin-right:auto;';
+
+function injectImgJustify(attrs: string): string {
+  const styleMatch = attrs.match(/(?<![a-z-])style\s*=\s*"([^"]*)"/i)
+    || attrs.match(/(?<![a-z-])style\s*=\s*'([^']*)'/i);
+  if (styleMatch) {
+    const cur = styleMatch[1] ?? '';
+    // 已含块级居中则不重复注入
+    if (/display\s*:\s*block/i.test(cur) && /margin(-left|-right)?\s*:/.test(cur)) return attrs;
+    const merged = `${cur.replace(/;\s*$/, '')};${IMG_JUSTIFY_STYLE}`;
+    return attrs.replace(styleMatch[0], `style="${merged}"`);
+  }
+  return `${attrs} style="${IMG_JUSTIFY_STYLE}"`;
+}
+
+/**
  * 扫描 HTML 正文中的所有 <img> 标签，将外链 src 改写为代理 URL
  * 同时处理微信懒加载图片（src 为空，data-src 有值）
+ * 并为所有图片注入块级居中样式（两端对齐排版）
  */
 export function rewriteContentImages(html: string): string {
   if (!html) return '';
@@ -107,13 +130,16 @@ export function rewriteContentImages(html: string): string {
     const useDataSrc = dataSrcValue && (!srcValue || srcValue.trim() === '');
     const realSrc = useDataSrc ? dataSrcValue : (srcValue ?? '');
 
-    // 跳过：data:URI（base64 内嵌）、相对路径、空 URL
+    // 跳过：data:URI（base64 内嵌）、相对路径、空 URL —— 但仍注入块级居中样式
     if (!realSrc || realSrc.startsWith('data:') || realSrc.startsWith('/')) {
-      return fullTag;
+      return `<img${injectImgJustify(attrs)}>`;
     }
 
     const proxyUrl = getImageUrl(realSrc);
-    if (proxyUrl === realSrc) return fullTag; // 无需代理，保持原样
+    if (proxyUrl === realSrc) {
+      // 无需代理 —— 但仍注入块级居中样式
+      return `<img${injectImgJustify(attrs)}>`;
+    }
 
     // 更新 src 属性为代理 URL
     let newAttrs: string;
@@ -131,6 +157,6 @@ export function rewriteContentImages(html: string): string {
         newAttrs = attrs + ` src="${proxyUrl}"`;
       }
     }
-    return `<img${newAttrs}>`;
+    return `<img${injectImgJustify(newAttrs)}>`;
   });
 }

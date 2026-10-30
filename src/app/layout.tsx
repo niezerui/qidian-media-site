@@ -9,6 +9,11 @@ export const metadata: Metadata = {
   title: { default: siteConfig.seo.defaultTitle, template: siteConfig.seo.titleTemplate },
   description: siteConfig.slogan,
   keywords: siteConfig.seo.keywords,
+  icons: {
+    icon: '/logo.png',
+    apple: '/logo.png',
+    shortcut: '/logo.png',
+  },
   authors: [{ name: siteConfig.name, url: SITE_URL }],
   creator: siteConfig.name,
   publisher: siteConfig.name,
@@ -41,6 +46,13 @@ export const metadata: Metadata = {
   },
   alternates: {
     canonical: SITE_URL,
+    types: {
+      // RSS 订阅源声明（浏览器/阅读器可自动发现）
+      'application/rss+xml': '/feed.xml',
+      // llms.txt 规范：本页的 Markdown 版本 + 站点内容索引
+      'text/markdown': '/index.md',
+      'text/plain': '/llms.txt',
+    },
   },
   other: {
     // 百度爬虫专用 meta（当百度验证未配置时留空）
@@ -102,7 +114,7 @@ const webSiteJsonLd = {
     '@type': 'SearchAction',
     target: {
       '@type': 'EntryPoint',
-      urlTemplate: `${SITE_URL}/?search={search_term_string}`,
+      urlTemplate: `${SITE_URL}/search?q={search_term_string}`,
     },
     'query-input': 'required name=search_term_string',
   },
@@ -123,6 +135,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         {/* 移动端优化 */}
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
+        {/* llms.txt：声明本站 LLM 友好内容索引（https://llmstxt.org/） */}
+        <link rel="describedby" href="/llms.txt" type="text/plain" title="LLM content index" />
 
         {/* 主题色 — 改善移动端浏览器 UI */}
         <meta name="theme-color" content="#121212" />

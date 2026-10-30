@@ -18,13 +18,24 @@ export default async function sitemap() {
     { url: `${SITE_URL}/advertise`, lastModified: now, changeFrequency: 'monthly' as const, priority: 0.3 },
   ];
 
-  // 分类页
-  const categoryPages = siteConfig.categories.map(c => ({
+  // 分类页（读数据库，与后台分类管理同步；失败回退静态配置）
+  let categoryPages: any[] = siteConfig.categories.map(c => ({
     url: `${SITE_URL}/category/${c.slug}`,
     lastModified: now,
     changeFrequency: 'hourly' as const,
     priority: 0.8,
   }));
+  try {
+    const cats = await query('SELECT slug FROM categories ORDER BY id');
+    if (Array.isArray(cats) && cats.length > 0) {
+      categoryPages = cats.map((c: any) => ({
+        url: `${SITE_URL}/category/${c.slug}`,
+        lastModified: now,
+        changeFrequency: 'hourly' as const,
+        priority: 0.8,
+      }));
+    }
+  } catch {}
 
   // 文章页
   let articlePages: any[] = [];

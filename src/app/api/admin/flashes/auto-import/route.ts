@@ -4,6 +4,9 @@ import { sanitizeInput } from '@/lib/security';
 
 const AUTO_IMPORT_KEY = process.env.FLASH_AUTO_KEY || 'qidian-flash-auto-2026-secure';
 
+// 自动快讯保留条数（滚动窗口）：保证首页轮播始终有 50+ 条不重复的内容
+const KEEP_AUTO = 400;
+
 interface FlashItem {
   title: string;
   content?: string;
@@ -71,10 +74,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 滚动保留：只保留最近的 KEEP_AUTO 条自动快讯（按发布时间倒序），
+    // 让快讯池能稳定积累到 50 条以上供轮播；手工添加的快讯不参与清理。
+    // 注意：不再按「当日」清理，否则夜间/凌晨会把列表清空导致轮播只有个位数。
+    let purged = 0;
+    try {
+      const r = await execute(
+        `DELETE FROM flash_news WHERE is_auto = 1 AND id NOT IN (
+           SELECT id FROM flash_news WHERE is_auto = 1
+           ORDER BY published_at DESC, id DESC LIMIT ${KEEP_AUTO}
+         )`
+      );
+      purged = r.rowsAffected;
+    } catch {}
+
     return NextResponse.json({
       success: true,
       inserted,
       duplicated,
+      purged,
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error: any) {

@@ -161,7 +161,7 @@ export default function ShareBar({ title, summary, coverImage, slug }: ShareBarP
       <div className="flex flex-col gap-2 py-5 border-t border-b my-6" style={{ borderColor: 'var(--c-border)' }}>
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium" style={{ color: 'var(--c-text-2)' }}>分享：</span>
-          <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full text-white" style={{ backgroundColor: '#07c160' }}>
+          <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 text-white" style={{ backgroundColor: '#07c160' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
               <path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 01.213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 00.167-.054l1.903-1.114a.864.864 0 01.717-.098 10.16 10.16 0 002.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 01-1.162 1.178A1.17 1.17 0 014.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 01-1.162 1.178 1.17 1.17 0 01-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 01.598.082l1.584.926a.272.272 0 00.14.047c.134 0 .24-.111.24-.247 0-.06-.023-.12-.038-.177l-.327-1.233a.582.582 0 01.182-.556C23.024 18.21 24 16.705 24 14.995c0-3.232-2.922-5.892-7.062-6.137zm-2.64 3.449c.535 0 .969.44.969.982a.976.976 0 01-.969.983.976.976 0 01-.969-.983c0-.542.434-.982.97-.982zm5.4 0c.535 0 .969.44.969.982a.976.976 0 01-.969.983.976.976 0 01-.969-.983c0-.542.434-.982.97-.982z"/>
             </svg>
@@ -191,7 +191,7 @@ export default function ShareBar({ title, summary, coverImage, slug }: ShareBarP
         {/* 系统原生分享按钮 — 弹出系统面板（含微信、微博等） */}
         <button
           onClick={handleNativeShare}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium text-white transition-opacity hover:opacity-80"
+          className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
           style={{ backgroundColor: 'var(--c-accent, #c41e3a)' }}
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -204,7 +204,7 @@ export default function ShareBar({ title, summary, coverImage, slug }: ShareBarP
         {/* 复制链接（备用） */}
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border transition-colors"
           style={{
             borderColor: copied ? '#22c55e' : 'var(--c-border)',
             color: copied ? '#22c55e' : 'var(--c-text-2)',
@@ -230,7 +230,7 @@ export default function ShareBar({ title, summary, coverImage, slug }: ShareBarP
         href={`https://service.weibo.com/share/share.php?url=${encodedUrl}&title=${encodedTitle}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-white transition-opacity hover:opacity-80"
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-80"
         style={{ backgroundColor: '#e6162d' }}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -244,7 +244,7 @@ export default function ShareBar({ title, summary, coverImage, slug }: ShareBarP
         href={`https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-white transition-opacity hover:opacity-80"
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-80"
         style={{ backgroundColor: '#000' }}
       >
         <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
@@ -256,7 +256,7 @@ export default function ShareBar({ title, summary, coverImage, slug }: ShareBarP
       {/* 复制链接 */}
       <button
         onClick={handleCopy}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border transition-colors"
         style={{
           borderColor: copied ? '#22c55e' : 'var(--c-border)',
           color: copied ? '#22c55e' : 'var(--c-text-2)',
@@ -289,7 +289,7 @@ function WechatDesktopShare({ url, onCopy }: { url: string; onCopy: () => void }
     <div className="relative">
       <button
         onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-white transition-opacity hover:opacity-80"
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-80"
         style={{ backgroundColor: '#07c160' }}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -303,19 +303,19 @@ function WechatDesktopShare({ url, onCopy }: { url: string; onCopy: () => void }
           {/* 背景遮罩（点击关闭） */}
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
-            className="absolute left-0 top-full mt-2 w-64 p-4 rounded-xl shadow-xl z-50"
+            className="absolute left-0 top-full mt-2 w-64 p-4 shadow-xl z-50"
             style={{ backgroundColor: 'white', border: '1px solid var(--c-border)' }}
           >
             <p className="text-sm font-semibold mb-1" style={{ color: 'var(--c-text)' }}>分享到微信</p>
             <p className="text-xs mb-3 leading-relaxed" style={{ color: 'var(--c-text-3)' }}>
               复制下面的链接，在微信中粘贴给好友或分享到朋友圈。分享后将自动显示文章标题、摘要和封面图片。
             </p>
-            <div className="flex items-center gap-1.5 p-2 rounded-lg text-xs font-mono mb-3 truncate" style={{ backgroundColor: 'var(--c-surface)', color: 'var(--c-text-2)' }}>
+            <div className="flex items-center gap-1.5 p-2 text-xs font-mono mb-3 truncate" style={{ backgroundColor: 'var(--c-surface)', color: 'var(--c-text-2)' }}>
               {url.slice(0, 50)}{url.length > 50 ? '…' : ''}
             </div>
             <button
               onClick={() => { onCopy(); setOpen(false); }}
-              className="w-full py-2 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90"
+              className="w-full py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
               style={{ backgroundColor: '#07c160' }}
             >
               复制链接
